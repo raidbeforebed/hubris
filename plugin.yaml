@@ -1,13 +1,13 @@
 name: hubris
-version: "1.7.0"
+version: "1.8.0"
 description: >-
-  HUBRIS: Heuristic Unverified-Belief Research Injection Signal. Makes live web research the
-  default before any factual answer. Classifies each turn, injects a search directive when the
-  question turns on current external facts, records whether a real web tool was actually used,
-  and stamps the reply when none was, because knowledge past a training cutoff is at best
-  undated and at worst overtaken by events. A taxonomy of ten topics decides what counts as
-  current external facts and every topic is a switch; individual subjects can be muted in one
-  field, and the footer names whatever fired. Deterministic: no LLM calls, standard library only.
+  HUBRIS: Heuristic Unverified-Belief Research Injection Signal. It makes live web research the
+  default before a factual answer. Every turn gets classified; when the question turns on current
+  facts, the model is told to search and cite. It records whether a web tool actually ran, and
+  marks the reply when none did, because knowledge past a training cutoff is undated at best and
+  overtaken by events at worst. Eleven topics decide what counts as current facts, each topic is a
+  switch, and the footer names the subject that fired. Deterministic, standard library only, no
+  model calls of its own.
 author: raidbeforebed
 kind: standalone
 requires_hermes: ">=0.22.0"
@@ -20,104 +20,111 @@ config_schema:
     type: bool
     default: true
     label: Enable hubris
-    description: Turn the behaviour off without disabling or removing the plugin.
+    description: Turn it off without uninstalling.
   nag_on_explicit:
     type: bool
     default: false
-    label: Warn even when I asked
+    label: Warn me even when I asked
     description: >-
-      When you say "go and look this up", hubris injects the directive but stays quiet in the
-      reply by default, because you already asked. Turn this on to get the footer anyway.
+      A turn you asked for gets the search request but no warning, because you already asked.
+      Turn this on to get the warning too.
   disabled_subjects:
     type: str
     default: ""
+    placeholder: "money.prices, hardware.stock"
     label: Muted subjects
     description: >-
-      Subjects to silence inside a topic that is otherwise on, comma separated. Write a subject
-      (money.prices) or a whole topic (money). The footer names ids in this form, so you can
-      copy one straight from a warning. Leave empty for none.
+      Silence one subject inside a topic that stays on. Write money.prices for one subject, or
+      money for the whole topic. The warning in a reply names the id to copy.
   exempt_patterns:
     type: str
     default: ""
+    placeholder: "my thesis, the draft"
     label: Never research these
     description: >-
-      Phrases that must never trigger research, comma separated or one per line. These win over
-      every topic and subject, so this is the safe override for a word the rules misread.
+      Words or phrases that never trigger research, comma separated or one per line. They beat
+      every topic and subject, so this is the override for a word the rules misread.
   extra_trigger_phrases:
     type: str
     default: ""
+    placeholder: "kubernetes, terraform plan"
     label: Always research these
     description: >-
-      Phrases that always mean "check the live web", for domains the taxonomy does not cover.
-      These bypass the taxonomy and the question-shape test. Leave empty for none.
+      Words or phrases that always mean check the web, comma separated or one per line. Use it
+      for a domain the topics miss.
   quiet_platforms:
     type: str
     default: ""
+    placeholder: "discord_voice, telegram"
     label: Quiet platforms
-    description: >-
-      Platforms that get neither the directive nor the footer, comma separated. For example:
-      discord_voice, telegram. Leave empty for none.
+    description: Platforms that get no search request and no warning, comma separated.
 
   # ---- topics ---------------------------------------------------------------------------
-  # One switch per topic. A whole topic off silences everything inside it; use the muted
-  # subjects field above to silence one subject and leave its siblings alone.
+  # One switch per topic. A topic off silences everything inside it; mute single subjects in
+  # the field above and leave their siblings alone.
+  topic_ai:
+    type: bool
+    default: true
+    label: "AI, models and harnesses"
+    description: >-
+      Model names, versions and coding harnesses. They change monthly. Subjects: ai.models, ai.harnesses, ai.agents.
   topic_freshness:
     type: bool
     default: true
     label: "Freshness"
     description: >-
-      Wording that means the answer may have moved since the model learned it. Covers: recency wording. Ids: freshness.recency.
+      Wording that says the answer may have moved. Subjects: freshness.recency.
   topic_choices:
     type: bool
     default: true
     label: "Comparisons and picks"
     description: >-
-      Asking which one, which usually means someone has already compared them. Covers: comparisons and picks. Ids: choices.comparison.
+      Asking which one, because someone already compared them. Subjects: choices.comparison.
   topic_money:
     type: bool
     default: true
     label: "Money and markets"
     description: >-
-      Prices, deals and rates, where last month's number is wrong this month. Covers: prices and deals; rates and crypto. Ids: money.prices, money.rates.
+      Prices, deals and rates, where last month's number is wrong. Subjects: money.prices, money.rates.
   topic_software:
     type: bool
     default: true
     label: "Software and versions"
     description: >-
-      Releases, deprecations and docs: the fastest-moving facts an agent can be wrong about. Covers: releases and versions; documentation. Ids: software.releases, software.docs.
+      Releases, deprecations and docs. The fastest-moving facts an agent gets wrong. Subjects: software.releases, software.docs.
   topic_hardware:
     type: bool
     default: true
     label: "Hardware and gear"
     description: >-
-      Specs, benchmarks and whether the thing is actually in stock. Covers: specs and reviews; availability. Ids: hardware.specs, hardware.stock.
+      Specs, benchmarks and whether the thing is in stock. Subjects: hardware.specs, hardware.stock.
   topic_law:
     type: bool
     default: true
     label: "Law, policy and benefits"
     description: >-
-      Rules, deadlines and entitlements, all of which move on someone else's schedule. Covers: rules and legality; deadlines and entitlements. Ids: law.statutes, law.deadlines.
+      Rules, deadlines and entitlements, all on someone else's schedule. Subjects: law.statutes, law.deadlines.
   topic_health:
     type: bool
     default: true
     label: "Health and medicine"
     description: >-
-      Guidance and alerts, where a stale answer is the expensive kind of wrong. Covers: guidance; recalls and outbreaks. Ids: health.guidance, health.alerts.
+      Guidance and alerts, where a stale answer costs the most. Subjects: health.guidance, health.alerts.
   topic_local:
     type: bool
     default: true
     label: "Local and logistics"
     description: >-
-      Weather, hours and roads: true only near you, and only right now. Covers: weather; places and roads. Ids: local.weather, local.places.
+      Weather, hours and roads. True near you, right now. Subjects: local.weather, local.places.
   topic_games:
     type: bool
     default: true
     label: "Games and modpacks"
     description: >-
-      The case that started this: a modpack's progression changes every release. Covers: packs and versions; guides and progression; recipes, crafting and wikis. Ids: games.versions, games.guides, games.recipes.
+      A modpack's progression changes every release. The case that started this. Subjects: games.versions, games.guides, games.recipes.
   topic_news:
     type: bool
     default: true
     label: "News and current events"
     description: >-
-      Elections, conflicts and headlines, where the answer changes by the hour. Covers: headlines, elections and officials; world events. Ids: news.politics, news.world.
+      Elections, conflicts and headlines, which change by the hour. Subjects: news.politics, news.world.

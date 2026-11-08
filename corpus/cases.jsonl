@@ -64,3 +64,8 @@
 {"id": "complaint-not-request", "text": "what did you do to address my complaint that you never search online first", "expect": false, "subjects": [], "note": "a complaint about searching is not a request to search"}
 {"id": "local-still-quiet", "text": "is hermes gateway running?", "expect": false, "subjects": [], "note": "no explicit ask, local topic: still quiet"}
 {"id": "code-still-quiet", "text": "fix the failing test in tools/approval.py", "expect": false, "subjects": [], "note": "no explicit ask, code work: still quiet"}
+{"id": "ai-vram-model", "text": "what's the best local model for 8GB of VRAM", "expect": true, "subjects": ["ai.models", "choices.comparison"], "note": "VRAM is a model constraint, not a local inventory question"}
+{"id": "ai-resource-local", "text": "how much vram do I have free on the 1070", "expect": false, "subjects": [], "note": "the same word, but this time it is about the machine"}
+{"id": "ai-model-availability", "text": "is kimi-k3.1-pro still available on ollama", "expect": true, "subjects": ["ai.models", "hardware.stock"], "note": "model availability"}
+{"id": "ai-harness-compare", "text": "how does opencode compare to claude code", "expect": true, "subjects": ["ai.harnesses", "choices.comparison"], "note": "harness comparison"}
+{"id": "ai-fragment", "text": "best model for coding right now", "expect": true, "subjects": ["ai.models"], "note": "superlative-leading fragment is a request"}
