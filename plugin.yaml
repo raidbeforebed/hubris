@@ -1,11 +1,13 @@
-name: source-first
-version: "1.1.0"
+name: hubris
+version: "1.2.0"
 description: >-
-  Makes live web research the default before any factual answer. Classifies each turn,
-  injects a search directive when the question turns on current external facts, records
-  whether a real web tool was actually used, and stamps the reply when none was. Stored
-  data, local archives and model training are treated as fallbacks that must be labelled
-  as such. Deterministic: no LLM calls, standard library only.
+  HUBRIS: Heuristic Unverified-Belief Research Injection Signal. Makes live web research the
+  default before any factual answer. Classifies each turn, injects a search directive when the
+  question turns on current external facts, records whether a real web tool was actually used,
+  and stamps the reply when none was, because knowledge past a training cutoff is at best
+  undated and at worst overtaken by events. Stored data, local archives and model training are
+  treated as fallbacks that must be labelled as such. Deterministic: no LLM calls, standard
+  library only.
 author: raidbeforebed
 kind: standalone
 requires_hermes: ">=0.22.0"
@@ -17,7 +19,7 @@ config_schema:
   enabled:
     type: bool
     default: true
-    label: Enable source-first
+    label: Enable hubris
     description: Turn the behaviour off without disabling or removing the plugin.
   quiet_platforms:
     type: list

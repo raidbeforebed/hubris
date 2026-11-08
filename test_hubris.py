@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for source-first. Run: python3 test_source_first.py
+"""Tests for hubris. Run: python3 test_hubris.py
 
 No pytest, no fixtures, no network: the plugin is deterministic, so the test is a table.
 """
@@ -15,17 +15,17 @@ HERE = Path(__file__).resolve().parent
 
 def _load_package():
     spec = importlib.util.spec_from_file_location(
-        "source_first", HERE / "__init__.py", submodule_search_locations=[str(HERE)]
+        "hubris", HERE / "__init__.py", submodule_search_locations=[str(HERE)]
     )
     assert spec is not None and spec.loader is not None, "cannot load the plugin package"
     module = importlib.util.module_from_spec(spec)
-    sys.modules["source_first"] = module
+    sys.modules["hubris"] = module
     spec.loader.exec_module(module)
     return module
 
 
 sf = _load_package()
-classifier = sys.modules["source_first.classifier"]
+classifier = sys.modules["hubris.classifier"]
 
 FAILS: list[str] = []
 
@@ -128,9 +128,10 @@ def test_hooks() -> None:
     injected = sf.on_pre_llm_call(
         session_id="t1", user_message="what is the best ATM10 guide right now?", platform="cli"
     )
-    check("directive injected for a research turn", bool(injected and "[source-first]" in injected["context"]))
+    check("directive injected for a research turn", bool(injected and "[hubris]" in injected["context"]))
     out = sf.on_transform_llm_output(response_text="Answer.", session_id="t1")
     check("footer appended when no search ran", bool(out and "no live web search ran" in out))
+    check("footer names the plugin and says OBE", bool(out and "hubris" in out and "OBE" in out))
     check("footer is idempotent", sf.on_transform_llm_output(response_text=out, session_id="t1") is None)
 
     # research turn with a real web search -> no footer
