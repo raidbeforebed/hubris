@@ -124,18 +124,41 @@ reading the reply, costs nothing when the classifier is right, and cannot loop.
 The directive is what changes behaviour; the footer is the tripwire that tells you the directive
 was ignored, and which switch to reach for if the tripwire was wrong.
 
-## Measured
+## Measuring it
 
-Replayed over 225 unique user messages from a live install's session database: **20 turns fired
-(8.9%)**. Hand-adjudicated, 17 were genuinely research turns and 3 were not: a local TTS error
-matching "available", a mechanical explainer matching "cost", and a statement about a past election
-matching "election".
+The numbers below are reproducible, not asserted. `corpus/cases.jsonl` holds 57 labelled turns
+and `eval.py` scores the classifier against them:
 
-Under the earlier flat-list design, the same 3 misses were unfixable without editing source. They
-are now three switches, and the footer says which one.
+```bash
+python3 eval.py                      # summary, every miss, per-subject tally
+python3 eval.py --show               # every case, pass or fail
+python3 eval.py --min-precision 1.0  # exit 1 below the floor, for CI
+```
 
-This is not a benchmark. It is the evidence that the trigger list is precise enough to leave on, and
-the shape of the remaining error.
+The corpus is **paraphrased, not collected**. Each case reproduces the *shape* of a failure that
+actually happened — a pasted traceback, a mechanical explainer, a statement that mentions an
+election — without shipping anyone's messages. Cases marked `known_miss` are counted and reported
+but do not fail the run.
+
+Current: **precision 1.000, recall 1.000** over 57 cases.
+
+On 225 replayed real messages from a live install (not my corpus): **17 fired, 7.6%**, and I judge
+all 17 to be genuine research turns. Before these fixes it was 20 fired with 3 wrong: a local TTS
+error matching "available", a mechanic's explainer matching "cost", and a statement about a past
+election matching "vote".
+
+Those three were fixed at their actual sites, not with a bigger word list:
+
+| Failure | Cause | Fix |
+|---|---|---|
+| TTS error | the classifier read pasted logs as prose | **scrub** fenced blocks, inline code and log lines before matching. Costs nothing in recall |
+| gas explainer | "explain ... cost ..." is not a request | **clause-scoped gate**: some clause must be a question or an ask. "explain" is not one |
+| mayor statement | "which" counted as a question word | **`which` is a determiner**, not an opener, unless it starts a real question ("which modpack version") |
+
+A wrong fire is invisible to a benchmark and expensive in real life, so precision is the number I
+optimise for. Recall is held by the escapes the gate allows: a "?" anywhere, a question word
+opening a clause, a question embedded mid-sentence ("... who won the mayor race"), a statement of
+need ("I just need a checklist"), or any explicit "go and look".
 
 ## Compatibility
 

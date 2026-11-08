@@ -99,8 +99,8 @@ TOPICS: tuple[Topic, ...] = (
         subjects=(
             _subject(
                 "money", "prices", "Money: prices and deals",
-                r"\b(price|prices|pricing|cost|costs|how much|msrp|cheap(?:est)?|deal|deals|"
-                r"discount|on sale|for sale|budget|quote)\b",
+                r"(?:\b(?:price|prices|pricing|cost|costs|how much|msrp|cheap(?:est)?|deal|deals|"
+                r"discount|on sale|for sale|budget|quote)\b|\$\s?\d)",
             ),
             _subject(
                 "money", "rates", "Money: rates and crypto",
@@ -116,7 +116,7 @@ TOPICS: tuple[Topic, ...] = (
         subjects=(
             _subject(
                 "software", "releases", "Software: releases and versions",
-                r"\b(version|versions|changelog|roadmap|deprecat\w*|end of life|eol|retired|"
+                r"\b(version|versions|release|releases|changelog|roadmap|deprecat\w*|end of life|"
                 r"sunset|breaking change|release date|supported|compatible)\b",
             ),
             _subject(
@@ -132,8 +132,8 @@ TOPICS: tuple[Topic, ...] = (
         subjects=(
             _subject(
                 "hardware", "specs", "Hardware: specs and reviews",
-                r"\b(specs?|specifications?|benchmark|benchmarks|review|reviews|rating|"
-                r"spec sheet|thermals?|wattage)\b",
+                r"\b(specs?|specifications?|benchmark|benchmarks|product reviews?|"
+                r"reviews? of|rating|spec sheet|thermals?|wattage)\b",
             ),
             _subject(
                 "hardware", "stock", "Hardware: availability",

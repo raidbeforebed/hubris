@@ -71,10 +71,80 @@ CORE_PATTERNS = [
 ]
 
 
-QUESTION_SHAPE = re.compile(r"\?|\b(what|which|who|when|where|why|how|is|are|does|do|can|"
-                             r"could|should|would|compare|recommend|research|need|find)\b|"
-                             r"\b(?:give|show|find|get|send|list|bring|pull)\s+me\b",
-                             re.IGNORECASE)
+QUESTION_SHAPE = re.compile(r"\?")
+
+# A clause that is actually a request. `which` is deliberately absent: as a determiner
+# ("which sucks") it opens a relative clause, not a question, and it was letting a statement
+# about a past election through. A real "which" question almost always carries a "?".
+_OPENERS = (
+    "what", "who", "when", "where", "why", "how", "is", "are", "was", "were", "does", "do",
+    "did", "can", "could", "should", "would", "will", "any",
+    # imperatives that ask for something external
+    "give", "show", "find", "get", "send", "list", "bring", "pull", "point", "tell",
+    "check", "look", "compare", "search", "research",
+)
+_CLAUSE_SPLIT = re.compile(r"[.!?;\n]+")
+_OPENER_RE = re.compile(
+    r"^\W*(?:what|who|when|where|why|how|is|are|was|were|does|do|did|can|could|should|would|"
+    r"will|any|give|show|find|get|send|list|bring|pull|point|tell|check|look|compare|search|"
+    r"research)\b"
+    # `which` opens a real question ("which modpack version") but also a relative clause
+    # ("which sucks"); only the first kind is a request.
+    r"|^\W*which\b(?!\s+(?:is|was|sucks|means|makes|would|could|has|had|i|we|they|he|she)\b)",
+    re.IGNORECASE,
+)
+
+# A question can sit mid-clause ("in the recent elections who won the mayor race") and a
+# request can be a statement of need ("I just need a checklist"). Both are requests; neither
+# starts with a question word.
+_EMBEDDED_QUESTION_RE = re.compile(
+    r"\b(?:who|what|when|where|which|how|why)\b\s+(?:\w+\s+){0,3}?"
+    r"(?:won|is|are|was|were|did|does|do|can|could|should|would|will|has|have|much|many)\b",
+    re.IGNORECASE,
+)
+_NEED_RE = re.compile(
+    r"\b(?:i (?:just |really |only )?need|i'?d like|i would like|i want|i'?m looking|"
+    r"i am looking|looking for|help me|i'?m trying|i am trying|any idea|do you know|"
+    r"tell me about|(?:give|show|send|get|find|list|bring|pull|point)\s+me)\b",
+    re.IGNORECASE,
+)
+
+# Pasted logs and code are not prose. Matching "version" inside `x.version`, or "available"
+# inside a provider error, is how a classifier earns a false positive with no recall cost to
+# avoid: strip them before any pattern sees the text. URLs are kept -- a pasted link is itself
+# a request to read it.
+_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+_LOG_LINE_RE = re.compile(
+    r"^(?:traceback \(most recent call last\)|file \".*\", line \d+|"
+    r"\s*at [\w.$]+\(.*\)|\w*(?:error|exception|warning)\w*: .*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _scrub(text: str) -> str:
+    """Remove pasted code and log lines, keeping prose and links."""
+    text = _FENCE_RE.sub(" ", text)
+    text = _INLINE_CODE_RE.sub(" ", text)
+    text = _LOG_LINE_RE.sub(" ", text)
+    return text
+
+
+def _is_request(text: str) -> bool:
+    """True when some clause is a question or an imperative ask.
+
+    Clause-scoped on purpose: a statement of fact that happens to mention an election is not a
+    question just because a question word appears later in a different clause.
+    """
+    if "?" in text:
+        return True
+    if _EMBEDDED_QUESTION_RE.search(text) or _NEED_RE.search(text):
+        return True
+    for clause in _CLAUSE_SPLIT.split(text):
+        if _OPENER_RE.match(clause.strip()):
+            return True
+    return False
+
 
 
 @dataclass(frozen=True)
@@ -112,8 +182,8 @@ def classify(
     with no settings wants. Skip wins over trigger: "never leave the machine for this" is
     the safer override.
     """
-    text = _normalise(message)
-    if not text:
+    text = _scrub(_normalise(message))
+    if not text.strip():
         return Verdict(False, "empty")
 
     for pattern in _user_phrases(extra_skip_phrases) + SKIP_PATTERNS:
@@ -127,16 +197,19 @@ def classify(
         if re.search(pattern, text, re.IGNORECASE):
             return Verdict(True, "user-phrase:" + pattern[:24], ("user",))
 
-    if not QUESTION_SHAPE.search(text):
-        return Verdict(False, "no-question-shape")
-
-    hits: list[str] = []
-    subjects: list[str] = []
-
+    # CORE is an explicit request by definition, so it does not need the clause gate. A pasted
+    # URL counts as one: the user handed over a link to read.
+    core_hits = []
     for pattern in CORE_PATTERNS:
         m = re.search(pattern, text, re.IGNORECASE)
         if m:
-            hits.append(m.group(0).strip())
+            core_hits.append(m.group(0).strip())
+
+    if not core_hits and not _is_request(text):
+        return Verdict(False, "no-request")
+
+    hits: list[str] = list(core_hits)
+    subjects: list[str] = []
 
     if live_subjects is None:
         live_subjects = {s.full_key for t in TOPICS for s in t.subjects}
