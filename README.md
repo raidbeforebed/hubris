@@ -87,14 +87,36 @@ hermes config set plugins.entries.hubris.settings.subject_money_prices false
 |---|---|---|---|
 | `enabled` | switch | on | Off without uninstalling. |
 | `topic_<name>` | switch | on | One per topic. Off silences every subject inside it. |
-| `subject_<topic>_<name>` | switch | on | One per subject. Off silences just that one. |
-| `extra_trigger_phrases` | text | empty | Always research these, comma separated. Bypasses the taxonomy and the question-shape test. |
-| `extra_skip_phrases` | text | empty | Never research these, comma separated. Wins over everything. |
+| `nag_on_explicit` | switch | off | Warn even on a turn you explicitly asked to be researched. |
+| `disabled_subjects` | text | empty | Mute one subject (`money.prices`) or a whole topic (`money`), comma separated. |
+| `exempt_patterns` | text | empty | Never research these, comma separated or one per line. Wins over everything. |
+| `extra_trigger_phrases` | text | empty | Always research these, for a domain the taxonomy does not cover. |
 | `quiet_platforms` | text | empty | Platforms that get neither directive nor footer, comma separated. |
+
+Sixteen rows: ten topic switches and six controls. Nineteen subject switches were tried and
+removed — the taxonomy is the classifier's structure, not a configuration surface, and nobody
+turns off `money.prices` while leaving `money` on. Per-subject control survives as one text field,
+and **the footer teaches the syntax**: a warning naming `money.prices` is telling you exactly what
+to type.
+
+```bash
+hermes config set plugins.entries.hubris.settings.topic_games false
+hermes config set plugins.entries.hubris.settings.disabled_subjects "money.prices, hardware.stock"
+```
+
+Unknown ids in `disabled_subjects` are logged and ignored rather than failing a hook, so a typo
+costs a warning, not a broken turn.
 
 The two phrase fields are the escape hatch: a domain the taxonomy does not cover, and a word the
 built-in rules misread. Both accept comma-separated text, one phrase per line, a JSON array, or a
 real YAML list, so a setting written by hand is never silently dropped.
+
+### Directive and nag are separate
+
+A turn that fires because *you asked* ("look this up") gets the search directive but no footer: you
+already said what you wanted, and a warning about a promise the plugin kept is just nagging. Set
+`nag_on_explicit` if you want it anyway. A turn that fires because the *taxonomy* matched gets the
+footer, because nobody asked.
 
 ## Install
 
@@ -219,7 +241,7 @@ never-list.*
 python3 test_hubris.py     # exits 1 on failure
 ```
 
-76 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers the
+84 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers the
 classification table (including every phrase that used to misfire), the taxonomy switches
 (topic-off, subject-off, everything-off, and the manifest never drifting from the code), which tools
 count as research, directive and footer behaviour, per-session ledger isolation, the settings form
@@ -230,8 +252,10 @@ path, quiet platforms, and both user phrase fields.
 Named `source-first` up to 1.1.0, renamed **HUBRIS** in 1.2.0. In 1.2.1 the list settings became
 plain comma-separated text, because a JSON editor is a miserable way to type one platform name and
 an empty JSON box reads as a broken form. In 1.4.0 the flat trigger list became the topic and
-subject taxonomy, so what counts as current external facts is a decision the user makes with
-switches rather than one the code makes for them.
+subject taxonomy. In 1.6.0 an explicit request was made to outrank the local-domain skip list, after
+replaying 77 real messages in which the author asked for a search showed recall at 41.6%. In 1.7.0
+the nineteen subject switches became one `disabled_subjects` field: sixteen settings rows, and the
+footer names the id to type.
 
 ## License
 

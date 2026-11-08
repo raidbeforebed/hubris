@@ -89,11 +89,18 @@ for text, want in CASES:
 # ---------------------------------------------------------------- taxonomy and its switches
 tax = sys.modules["hubris.taxonomy"]
 
-# The manifest and the taxonomy must not drift: every switch declared, none invented.
+# The manifest and the taxonomy must not drift: every topic declared, no subject switches.
 manifest_text = (HERE / "plugin.yaml").read_text(encoding="utf-8")
 declared = set(re.findall(r"^  (topic_[a-z_]+|subject_[a-z_]+):", manifest_text, re.M))
-check("every taxonomy switch is declared in the manifest", set(tax.setting_keys()) == declared)
-check("the switch count is the documented one", len(declared) == 29)
+check("every topic is a switch", declared == {t.setting_key for t in tax.TOPICS})
+check("subjects are config, not switches", not any(k.startswith("subject_") for k in declared))
+
+# `disabled_subjects` accepts a subject, a whole topic, or a forgiving spelling of either.
+check("mute one subject by id", sf._disabled_subjects("money.prices") == {"money.prices"})
+check("mute a whole topic", sf._disabled_subjects("money") == {"money.prices", "money.rates"})
+check("spaces and underscores are forgiving", sf._disabled_subjects("money prices") == {"money.prices"})
+check("a list mutes several", sf._disabled_subjects("money.rates, games.recipes") == {"money.rates", "games.recipes"})
+check("an unknown id is ignored, not fatal", sf._disabled_subjects("nonsense.thing, money.prices") == {"money.prices"})
 
 # A topic switch is one click for everything inside it.
 everything = tax.all_subject_keys()
@@ -274,12 +281,34 @@ def test_hooks() -> None:
     finally:
         sf._CTX = previous
 
-    # a skip phrase wins over every built-in trigger
+    # a phrase the user taught wins; a phrase they banned wins harder
     check(
         "extra skip phrase wins over a trigger",
         not classifier.classify(
             "what is the best thesis topic", extra_skip_phrases=["thesis topic"]
         ).research,
+    )
+
+    # An explicit request gets the directive but no footer unless asked for -- otherwise the
+    # plugin nags about a promise the user already made.
+    sf.on_pre_llm_call(session_id="n1", user_message="please look this up for me")
+    check(
+        "explicit-only turn is quiet in the reply by default",
+        sf.on_transform_llm_output(response_text="x", session_id="n1") is None,
+    )
+    previous = with_settings(nag_on_explicit=True)
+    try:
+        sf.on_pre_llm_call(session_id="n2", user_message="please look this up for me")
+        out2 = sf.on_transform_llm_output(response_text="x", session_id="n2")
+        check("nag_on_explicit restores the footer", bool(out2 and "OBE" in out2))
+    finally:
+        sf._CTX = previous
+
+    # A taxonomy turn still gets the footer, because nobody asked.
+    sf.on_pre_llm_call(session_id="n3", user_message="what is the current modpack version?")
+    check(
+        "a taxonomy turn still gets the footer",
+        bool(sf.on_transform_llm_output(response_text="x", session_id="n3")),
     )
 
     # a phrase list is accepted in every shape the settings have ever stored
