@@ -160,6 +160,38 @@ optimise for. Recall is held by the escapes the gate allows: a "?" anywhere, a q
 opening a clause, a question embedded mid-sentence ("... who won the mayor race"), a statement of
 need ("I just need a checklist"), or any explicit "go and look".
 
+### The test that changed the design
+
+A corpus you wrote yourself can only confirm what you already believe. So the second test uses
+real messages the author actually typed, filtered to the 77 where he **explicitly asked for a
+search** — "did you check online whether other users hit this?", "research how X works", "web
+search: Y". Those are ground truth positives that no paraphrase can argue with.
+
+The first run caught **41.6%**. Fifty-five percent of the times a user said "go and look", the
+plugin stayed quiet — because the local-domain skip list ran *before* the request check, and words
+like `hermes`, `repo`, `gpu`, `school` and even an IP address in an OAuth question swallowed the
+request whole. Twenty-one of the 45 misses died on the word "hermes" alone.
+
+The fix was ordering, not vocabulary:
+
+```
+bare acknowledgement -> quiet
+user phrase lists    -> win
+complaint            -> quiet      ("you never search online" is not a request to search)
+explicit request     -> FIRE       (outranks the skip list)
+local/personal       -> quiet
+question shape       -> gate
+taxonomy             -> fire or quiet
+```
+
+That took explicit-directive recall from **41.6% to 94.8%**, with general traffic unchanged at 8%
+and no new false positives on 226 messages. The four remaining misses are complaints and
+statements that mention searching, which is the correct answer.
+
+The lesson is in the code as a comment, because it is the kind of thing a later refactor undoes in
+one line: *an explicit request outranks everything except a bare acknowledgement and the user's own
+never-list.*
+
 ## Compatibility
 
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.

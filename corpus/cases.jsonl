@@ -55,3 +55,12 @@
 {"id": "no-explain-cost", "text": "explain what the running cost of a heat pump looks like over ten years", "expect": false, "subjects": [], "note": "explain + cost, no commercial cue"}
 {"id": "no-log-paste", "text": "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: bad version string", "expect": false, "subjects": [], "note": "traceback"}
 {"id": "no-quoted-code", "text": "why does this return None: `def f(x): return x.version`", "expect": false, "subjects": [], "note": "inline code"}
+{"id": "explicit-hermes-users", "text": "did you check online whether other Hermes users hit this same bug", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'hermes' skip word"}
+{"id": "explicit-gpu-research", "text": "Research whether a 24GB GPU can practically run a 70B model", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'gpu' skip word"}
+{"id": "explicit-repo-research", "text": "Research the GitHub repository https://github.com/acme/widget and summarise its architecture", "expect": true, "subjects": ["core"], "note": "explicit ask + URL must outrank the 'repo' skip word"}
+{"id": "explicit-web-search", "text": "Web search: API pricing per 1M tokens, specific dollar amounts", "expect": true, "subjects": [], "note": "'web search:' is an explicit directive"}
+{"id": "explicit-check-online", "text": "check online to see if those search engines changed their usage policy", "expect": true, "subjects": [], "note": "explicit check online"}
+{"id": "explicit-school-research", "text": "i need you to research the efficacy of summer school programs on reading scores", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'school' skip word"}
+{"id": "complaint-not-request", "text": "what did you do to address my complaint that you never search online first", "expect": false, "subjects": [], "note": "a complaint about searching is not a request to search"}
+{"id": "local-still-quiet", "text": "is hermes gateway running?", "expect": false, "subjects": [], "note": "no explicit ask, local topic: still quiet"}
+{"id": "code-still-quiet", "text": "fix the failing test in tools/approval.py", "expect": false, "subjects": [], "note": "no explicit ask, code work: still quiet"}
