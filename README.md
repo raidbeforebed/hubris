@@ -26,19 +26,75 @@ is closest at hand. A hook does, because a hook does not negotiate.
 |---|---|
 | `pre_llm_call` | Classifies the turn. When it turns on current external facts, injects a directive: search first, label anything from a fallback, cite the URLs read. |
 | `post_tool_call` | Records whether a live web tool actually fired, per session. |
-| `transform_llm_output` | If the turn needed research and none ran, appends a visible footer: *potentially OBE, undated background knowledge, not verified current fact*. |
+| `transform_llm_output` | If the turn needed research and none ran, appends a footer naming the subject that fired and marking the answer as potentially OBE. |
 
 Deterministic. Standard library only. **No LLM calls, no network of its own**, so it cannot slow a
 turn or spend tokens.
 
-## Why a footer, and not a block
+The footer names its own cause, which is the part that makes the plugin teachable:
 
-A block on the final answer is the obvious design and the wrong one: it turns a classification
-mistake into a stuck turn, and the classifier is a heuristic. The footer is unmissable to the person
-reading the reply, costs nothing when the classifier is right, and cannot loop.
+> **hubris:** this turn turned on `money.prices, freshness.recency` and no live web search ran. Treat
+> the answer above as potentially OBE (overtaken by events): undated background knowledge, not
+> verified current fact.
 
-The directive is what changes behaviour; the footer is the tripwire that tells you the directive
-was ignored.
+If that footer is wrong for you, you now know exactly which switch to turn off.
+
+## The taxonomy: you own the judgement
+
+The first version of this plugin had one flat regex list, and that was the design flaw: it encoded
+*my* idea of what deserves research, and every user's idea is different. A trader wants prices;
+someone debugging a kernel wants nothing to do with them.
+
+So the vocabulary is data now, and every part of it is a switch in the settings form:
+
+| Topic | Subjects |
+|---|---|
+| **Freshness** | recency wording ("latest", "up to date", "still supported") |
+| **Comparisons and picks** | comparisons ("best", "vs", "worth it", "recommend") |
+| **Money and markets** | prices and deals; rates and crypto |
+| **Software and versions** | releases and versions; documentation |
+| **Hardware and gear** | specs and reviews; availability |
+| **Law, policy and benefits** | rules and legality; deadlines and entitlements |
+| **Health and medicine** | guidance; recalls and outbreaks |
+| **Local and logistics** | weather; places and roads |
+| **Games and modpacks** | packs and versions; guides and progression; recipes and wikis |
+| **News and current events** | headlines, elections and officials; world events |
+
+Ten topics, nineteen subjects, and two rules that make the switches mean what they say:
+
+1. **A subject fires only when its own switch and its topic's switch are both on**, so a topic switch
+   is a one-click "all of this".
+2. **A disabled topic really is silent.** Nothing outside the taxonomy fires on domain vocabulary —
+   "latest" and "best" are subjects too, not hidden always-on rules — so switching off Money is not
+   quietly overridden by the word "current".
+
+The one thing a switch cannot silence is an explicit request: a search verb, a pasted URL, or
+"how do I". If you say *"go and look this up"*, it looks, whatever the switches say.
+
+## Settings
+
+The manifest declares a `config_schema`, so the **Desktop app renders the whole thing as a form**
+at Settings, Plugins, hubris. Every default is visible as a switch position, and every one is
+editable. Values are written to `plugins.entries.hubris.settings.*` in `config.yaml`, so the same
+settings are reachable from a terminal:
+
+```bash
+hermes config set plugins.entries.hubris.settings.topic_games false
+hermes config set plugins.entries.hubris.settings.subject_money_prices false
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | switch | on | Off without uninstalling. |
+| `topic_<name>` | switch | on | One per topic. Off silences every subject inside it. |
+| `subject_<topic>_<name>` | switch | on | One per subject. Off silences just that one. |
+| `extra_trigger_phrases` | text | empty | Always research these, comma separated. Bypasses the taxonomy and the question-shape test. |
+| `extra_skip_phrases` | text | empty | Never research these, comma separated. Wins over everything. |
+| `quiet_platforms` | text | empty | Platforms that get neither directive nor footer, comma separated. |
+
+The two phrase fields are the escape hatch: a domain the taxonomy does not cover, and a word the
+built-in rules misread. Both accept comma-separated text, one phrase per line, a JSON array, or a
+real YAML list, so a setting written by hand is never silently dropped.
 
 ## Install
 
@@ -59,89 +115,48 @@ Which All the Mods 10 modpack version is current right now?
 
 The answer should cite URLs it actually read. If it does not, the reply carries the footer.
 
-## Settings
+## Why a footer, and not a block
 
-The manifest declares a `config_schema`, so the **Desktop app renders a form automatically** at
-Settings, Plugins, hubris (and the gear on its row in Capabilities, Plugins). No Desktop code is
-involved. Values are written to `plugins.entries.hubris.settings.*` in `config.yaml`, so the same
-settings are reachable from a terminal:
+A block on the final answer is the obvious design and the wrong one: it turns a classification
+mistake into a stuck turn, and the classifier is a heuristic. The footer is unmissable to the person
+reading the reply, costs nothing when the classifier is right, and cannot loop.
 
-```bash
-hermes config set plugins.entries.hubris.settings.enabled false
-```
+The directive is what changes behaviour; the footer is the tripwire that tells you the directive
+was ignored, and which switch to reach for if the tripwire was wrong.
 
-| Key | Type | Default | Meaning |
-|---|---|---|---|
-| `enabled` | bool | `true` | Turn the behaviour off without disabling or removing the plugin. |
-| `quiet_platforms` | text | empty | Platform names that get neither the directive nor the footer, comma separated. `discord_voice, telegram`. |
-| `extra_trigger_phrases` | text | empty | Phrases that mean "check the live web", comma separated or one per line. |
-| `extra_skip_phrases` | text | empty | Phrases that must never trigger research, comma separated. These win over every trigger. |
+## Measured
 
-Empty is a real state, not a missing value: the built-in rules run on their own, and the two
-phrase fields only ever *add* to them. Type `kubectl, homelab price` in the field and it becomes
-two phrases.
+Replayed over 225 unique user messages from a live install's session database: **20 turns fired
+(8.9%)**. Hand-adjudicated, 17 were genuinely research turns and 3 were not: a local TTS error
+matching "available", a mechanical explainer matching "cost", and a statement about a past election
+matching "election".
 
-The stored shape is forgiving on purpose. A comma-separated line, one phrase per line, a JSON
-array (`["kubectl"]`), or a real YAML list all parse to the same thing, so a setting written by
-hand in `config.yaml` is never silently dropped.
+Under the earlier flat-list design, the same 3 misses were unfixable without editing source. They
+are now three switches, and the footer says which one.
 
-Extra trigger phrases bypass the built-in question-shape test, because a phrase you taught the
-plugin is an explicit opt-in. Extra skip phrases are checked before everything else, so they are
-the safe override for a word the built-in rules misread. Matching is case-insensitive plain text,
-so there is nothing to escape.
-
-## Classification
-
-Two explicit lists in `classifier.py`: `SKIP_PATTERNS` never research (this installation and its
-hosts, IPs, paths, services; personal and family context; coding and repo work; memory and meta
-questions about the assistant; bare acknowledgements; standing instructions about how to answer
-*later*). `TRIGGER_PATTERNS` do: recency in a phrase that means the world moved, price, version,
-availability, comparison and recommendation, an explicit "go and find out", how-to, a pasted URL,
-and domains where a stale answer is expensive (news, law, docs, modpacks).
-
-Every trigger is an *external-facts* shape rather than an everyday word. An earlier version fired
-on bare "now", "still", "today" and "which is", which put the footer on "are you still working"
-and on local device control; those words now only count inside phrases like "still supported" or
-"current version". A bare "ok" is skipped, but a substantive turn that merely starts with "ok" is
-not.
-
-Asymmetric on purpose: a false positive costs one nudge and at worst one footer, while a false
-negative is the failure this plugin exists to prevent.
-
-### Measured
-
-Replayed over 225 unique user messages from a live install's session database: **17 turns fired
-(7.6%)**. Hand-adjudicated, 15 of those 17 were genuinely research turns and 2 were not (a local
-TTS error report, and a mechanical explainer that matched on "costs"). A false positive is one
-line of nudge and, only if the turn ends without a search, one footer.
-
-This is not a benchmark. It is the evidence that the trigger list is precise enough to leave on,
-and the shape of the remaining error. Re-run it on your own traffic before trusting the numbers:
-the point of the two phrase lists is that you can fix a wrong call without editing this file.
+This is not a benchmark. It is the evidence that the trigger list is precise enough to leave on, and
+the shape of the remaining error.
 
 ## Compatibility
 
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.
 - `pre_llm_call` is the same seam `research-guard` uses: do not run both, they inject competing
   directives.
-- `transform_llm_output` takes the **first non-empty string** any plugin returns, so do not run
-  two plugins that both rewrite replies. If you also use a citation checker, prefer a version
-  that appends through this plugin, or run only one of them.
-- Local search is not web research: `search_files` and `session_search` deliberately do not
-  satisfy the check, or the footer would go quiet on turns that never left the machine.
+- `transform_llm_output` takes the **first non-empty string** any plugin returns, so do not run two
+  plugins that both rewrite replies. If you also use a citation checker, prefer a version that
+  appends through this plugin, or run only one of them.
+- Local search is not web research: `search_files` and `session_search` deliberately do not satisfy
+  the check, or the footer would go quiet on turns that never left the machine.
 
 ## Prior art
 
-Read these before forking:
-
 - [`Cesarus85/hermes-research-guard`](https://github.com/Cesarus85/hermes-research-guard): a
-  `pre_llm_call` research injector with a much richer trigger taxonomy, gated to local and small
-  models.
+  `pre_llm_call` research injector with a rich trigger taxonomy, gated to local and small models.
 - [`citation-guard`](https://github.com/ChienNguyen23/hermes-citation-guard) in the Hermes catalog:
   a reply guard that verifies fabricated references. Adjacent seam, different job.
-- [`search-sources`](https://github.com/ShowUNow/hermes-search-sources) in the Hermes catalog:
-  shows the pages a turn *did* search. This plugin is the complement: it complains when the turn
-  searched nothing.
+- [`search-sources`](https://github.com/ShowUNow/hermes-search-sources) in the Hermes catalog: shows
+  the pages a turn *did* search. This plugin is the complement: it complains when the turn searched
+  nothing.
 
 ## Tests
 
@@ -149,17 +164,19 @@ Read these before forking:
 python3 test_hubris.py     # exits 1 on failure
 ```
 
-69 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers
-the classification table (including every phrase that used to misfire), which tools count as
-research, directive and footer behaviour, per-session ledger isolation, the settings form path,
-quiet platforms, and both user phrase lists.
+76 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers the
+classification table (including every phrase that used to misfire), the taxonomy switches
+(topic-off, subject-off, everything-off, and the manifest never drifting from the code), which tools
+count as research, directive and footer behaviour, per-session ledger isolation, the settings form
+path, quiet platforms, and both user phrase fields.
 
 ## History
 
-Named `source-first` up to 1.1.0. Renamed **HUBRIS** in 1.2.0, so the plugin id, the settings path
-(`plugins.entries.hubris.settings`) and the footer label all changed with it. In 1.2.1 the three
-list settings became plain comma-separated text: a JSON editor is a miserable way to type one
-platform name, and an empty JSON box reads as a broken form rather than as "no phrases added".
+Named `source-first` up to 1.1.0, renamed **HUBRIS** in 1.2.0. In 1.2.1 the list settings became
+plain comma-separated text, because a JSON editor is a miserable way to type one platform name and
+an empty JSON box reads as a broken form. In 1.4.0 the flat trigger list became the topic and
+subject taxonomy, so what counts as current external facts is a decision the user makes with
+switches rather than one the code makes for them.
 
 ## License
 
