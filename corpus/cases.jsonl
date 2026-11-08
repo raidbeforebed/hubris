@@ -1,0 +1,57 @@
+{"id": "money-price-plain", "text": "What's the price of a Raspberry Pi 5 right now?", "expect": true, "subjects": ["money.prices"], "note": "price + recency"}
+{"id": "money-how-much", "text": "How much does a 2TB NVMe cost?", "expect": true, "subjects": ["money.prices"], "note": "how much"}
+{"id": "money-budget", "text": "I want a mechanical keyboard for about $80, what should I get?", "expect": true, "subjects": ["money.prices"], "note": "budget + $"}
+{"id": "money-crypto", "text": "what is bitcoin trading at today", "expect": true, "subjects": ["money.rates"], "note": "crypto"}
+{"id": "money-rates", "text": "did the mortgage rate change this month?", "expect": true, "subjects": ["money.rates", "freshness.recency"], "note": "rates"}
+{"id": "money-used-car", "text": "what's a fair asking price for a 2014 Civic with 90k miles", "expect": true, "subjects": ["money.prices"], "note": "price"}
+{"id": "choices-best-ssd", "text": "What's the best budget SSD for a laptop?", "expect": true, "subjects": ["choices.comparison", "money.prices"], "note": "best + budget"}
+{"id": "choices-ar15", "text": "what are the best AR-15s under $600", "expect": true, "subjects": ["choices.comparison", "money.prices"], "note": "best + budget"}
+{"id": "choices-vs", "text": "compare draw.io and mermaid for this diagram", "expect": true, "subjects": ["choices.comparison"], "note": "compare"}
+{"id": "choices-pi", "text": "Is a Pi 5 better than an N100 box for Home Assistant?", "expect": true, "subjects": ["choices.comparison"], "note": "better than"}
+{"id": "software-atm10", "text": "Which All the Mods 10 modpack version is current right now?", "expect": true, "subjects": ["games.versions", "freshness.recency", "software.releases"], "note": "the case that started it"}
+{"id": "software-python", "text": "Is Python 3.9 still supported?", "expect": true, "subjects": ["freshness.recency", "software.releases"], "note": "still supported"}
+{"id": "software-chrome", "text": "what's the latest Chrome release?", "expect": true, "subjects": ["freshness.recency", "software.releases"], "note": "latest release"}
+{"id": "software-docs", "text": "point me at the online documentation for the OpenAI python sdk", "expect": true, "subjects": ["software.docs"], "note": "documentation"}
+{"id": "software-eol", "text": "when does Windows 10 reach end of life", "expect": true, "subjects": ["software.releases"], "note": "eol"}
+{"id": "hardware-boxed-set", "text": "is there a D&D 5e boxed set available?", "expect": true, "subjects": ["hardware.stock"], "note": "availability"}
+{"id": "hardware-stock", "text": "is the 9800X3D in stock anywhere this week?", "expect": true, "subjects": ["hardware.stock"], "note": "in stock"}
+{"id": "hardware-bench", "text": "how does the 4070 benchmark against a 3080", "expect": true, "subjects": ["hardware.specs"], "note": "benchmark"}
+{"id": "law-hunting", "text": "it's legal to hunt deer in Louisiana with that rifle, correct?", "expect": true, "subjects": ["law.statutes"], "note": "legality"}
+{"id": "law-tax", "text": "when is the tax filing deadline this year", "expect": true, "subjects": ["law.deadlines", "freshness.recency"], "note": "deadline"}
+{"id": "law-permit", "text": "do I need a permit to build a shed in Tangipahoa parish", "expect": true, "subjects": ["law.statutes"], "note": "permit"}
+{"id": "health-outbreak", "text": "is there a measles outbreak in Texas right now", "expect": true, "subjects": ["health.alerts"], "note": "outbreak"}
+{"id": "health-dosage", "text": "what's the current guidance on ibuprofen dosage for adults", "expect": true, "subjects": ["health.guidance"], "note": "guidance"}
+{"id": "local-weather", "text": "what's the weather forecast for tomorrow", "expect": true, "subjects": ["local.weather"], "note": "forecast"}
+{"id": "local-hours", "text": "are the store hours still the same after the storm?", "expect": true, "subjects": ["local.places", "local.weather"], "note": "hours + storm"}
+{"id": "games-checklist", "text": "I just need a checklist or where to start with the ATM Star", "expect": true, "subjects": ["games.guides"], "note": "the original failure"}
+{"id": "games-recipe", "text": "I need you to look up a jambalaya recipe for me", "expect": true, "subjects": ["games.recipes"], "note": "explicit look up + recipe"}
+{"id": "games-wiki", "text": "which wiki has the best AE2 progression notes", "expect": true, "subjects": ["games.recipes", "games.guides"], "note": "wiki + progression"}
+{"id": "news-election", "text": "in the recent elections in Hammond who won the mayor race", "expect": true, "subjects": ["news.politics"], "note": "election"}
+{"id": "news-headlines", "text": "what are the headlines today", "expect": true, "subjects": ["news.politics"], "note": "headlines"}
+{"id": "core-check-online", "text": "Can you check online instead of guessing", "expect": true, "subjects": [], "note": "explicit"}
+{"id": "core-url", "text": "https://example.com/some-article  what does this say", "expect": true, "subjects": ["core"], "note": "pasted URL"}
+{"id": "core-howto", "text": "how do I reset a Roomba i3", "expect": true, "subjects": [], "note": "how to"}
+{"id": "core-find", "text": "can you find me a replacement belt for a Kenmore 600", "expect": true, "subjects": [], "note": "can you find"}
+{"id": "core-research", "text": "Also research whether there are any performance settings worth tuning", "expect": true, "subjects": [], "note": "explicit research"}
+{"id": "no-bare-now", "text": "So hold the clean button down now?", "expect": false, "subjects": [], "note": "bare 'now' used to fire"}
+{"id": "no-still-updating", "text": "are you still updating", "expect": false, "subjects": [], "note": "bare 'still' used to fire"}
+{"id": "no-which-better", "text": "which is better for you", "expect": false, "subjects": [], "note": "bare 'which is' used to fire"}
+{"id": "no-best-to-fix", "text": "do what you think is best to fix it", "expect": false, "subjects": [], "note": "'best to' is not a comparison"}
+{"id": "no-still-working", "text": "I'm still not sure if this is working.", "expect": false, "subjects": [], "note": "bare 'still'"}
+{"id": "no-ack", "text": "ok", "expect": false, "subjects": [], "note": "bare acknowledgement"}
+{"id": "no-ack-thanks", "text": "thanks, that looks good", "expect": false, "subjects": [], "note": "acknowledgement"}
+{"id": "no-ack-go", "text": "go ahead and do it", "expect": false, "subjects": [], "note": "acknowledgement"}
+{"id": "no-ack-substantive", "text": "ok, so we need to decide between the two options, what do you think", "expect": false, "subjects": ["choices.comparison"], "note": "starts with ok but is a real turn; comparison only, no external topic"}
+{"id": "no-hermes", "text": "is hermes gateway running?", "expect": false, "subjects": [], "note": "this install"}
+{"id": "no-ssh", "text": "what is the SSH port of the PC?", "expect": false, "subjects": [], "note": "this install"}
+{"id": "no-family", "text": "Jackson is weak on integer exponents, what should we do?", "expect": false, "subjects": [], "note": "family"}
+{"id": "no-code", "text": "fix the failing test in tools/approval.py", "expect": false, "subjects": [], "note": "code"}
+{"id": "no-memory", "text": "remember that I prefer short answers", "expect": false, "subjects": [], "note": "memory"}
+{"id": "no-plugin", "text": "add a /citecheck command to the plugin", "expect": false, "subjects": [], "note": "this install"}
+{"id": "no-when-researching", "text": "when you are researching prices for me, can you give me hyperlinks", "expect": false, "subjects": [], "note": "standing instruction"}
+{"id": "no-tts-error", "text": "I saw this error: TTS chunk 1 failed (luxtts): provider 'luxtts' is unavailable", "expect": false, "subjects": [], "note": "pasted service error: 'available' must not fire"}
+{"id": "no-gas-explainer", "text": "explain the benefits of the mid-length gas system on an AR", "expect": false, "subjects": [], "note": "mechanical explainer: 'benefits' must not fire"}
+{"id": "no-mayor-statement", "text": "We don't live in the city proper, so we never got to vote for Mayor. which sucks", "expect": false, "subjects": [], "note": "'which' is a determiner, not a question"}
+{"id": "no-explain-cost", "text": "explain what the running cost of a heat pump looks like over ten years", "expect": false, "subjects": [], "note": "explain + cost, no commercial cue"}
+{"id": "no-log-paste", "text": "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: bad version string", "expect": false, "subjects": [], "note": "traceback"}
+{"id": "no-quoted-code", "text": "why does this return None: `def f(x): return x.version`", "expect": false, "subjects": [], "note": "inline code"}
