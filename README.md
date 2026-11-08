@@ -193,6 +193,13 @@ in one line.
 ## Compatibility
 
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.
+- **Works on stock Hermes.** Everything above is plugin code: the classification, the hooks, the
+  taxonomy, all seventeen settings rows. Verified against an unpatched checkout, where the suite
+  passes 84 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
+  "config schema: shape valid".
+- `placeholder` in the manifest is optional polish. A backend that passes it through shows an
+  example in grey while a field is empty; one that does not ignores the key and renders an empty
+  field. Nothing else changes, and no setting depends on it.
 - `pre_llm_call` is the seam `research-guard` also uses. Do not run both; they inject competing
   instructions.
 - `transform_llm_output` takes the first non-empty string any plugin returns, so do not run two
