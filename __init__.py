@@ -62,9 +62,11 @@ _FOOTER = (
 
 _DEFAULTS = {
     "enabled": True,
+    "nag_on_explicit": False,
     "quiet_platforms": "",
     "extra_trigger_phrases": "",
-    "extra_skip_phrases": "",
+    "exempt_patterns": "",
+    "disabled_subjects": "",
 }
 
 
@@ -107,6 +109,30 @@ def _flag(value, default: bool = True) -> bool:
     return default
 
 
+def _disabled_subjects(value) -> set[str]:
+    """`disabled_subjects` as a set of `topic.subject` keys.
+
+    Accepts a subject (`money.prices`), a topic (`money`, meaning every subject in it), or a
+    comma/newline separated list of either. Whitespace is forgiving: "money prices" works.
+    An unknown id is warned about and ignored -- fail soft, never crash a hook on a typo.
+    """
+    topics = {t.key: t for t in TOPICS}
+    out: set[str] = set()
+    for token in _as_phrases(value):
+        key = token.strip().lower().replace(" ", ".").replace("_", ".")
+        if "." in key:
+            topic = topics.get(key.split(".", 1)[0])
+            if topic is None or key not in {s.full_key for s in topic.subjects}:
+                log.warning("hubris: disabled_subjects has an unknown id: %r", token)
+                continue
+            out.add(key)
+        elif key in topics:
+            out |= {s.full_key for s in topics[key].subjects}
+        else:
+            log.warning("hubris: disabled_subjects has an unknown topic: %r", token)
+    return out
+
+
 def _settings() -> dict:
     """This plugin's settings, fail-open.
 
@@ -119,30 +145,31 @@ def _settings() -> dict:
     getter = getattr(_CTX, "get_config", None)
     if not callable(getter):
         return {
-            "enabled": True,
-            "quiet_platforms": [],
-            "extra_trigger_phrases": [],
-            "extra_skip_phrases": [],
-            "live_subjects": every_subject,
+           "enabled": True,
+           "nag_on_explicit": False,
+           "quiet_platforms": [],
+           "extra_trigger_phrases": [],
+           "exempt_patterns": [],
+           "live_subjects": every_subject,
         }
 
     def read(key, default):
         try:
-            return getter(key, default)
+           return getter(key, default)
         except Exception:
-            return default
+           return default
 
     out = {
         "enabled": _flag(read("enabled", True)),
+        "nag_on_explicit": _flag(read("nag_on_explicit", False)),
         "quiet_platforms": _as_phrases(read("quiet_platforms", "")),
         "extra_trigger_phrases": _as_phrases(read("extra_trigger_phrases", "")),
-        "extra_skip_phrases": _as_phrases(read("extra_skip_phrases", "")),
+        "exempt_patterns": _as_phrases(read("exempt_patterns", "")),
     }
     topic_flags = {t.key: _flag(read(t.setting_key, True)) for t in TOPICS}
-    subject_flags = {
-        s.full_key: _flag(read(s.setting_key, True)) for t in TOPICS for s in t.subjects
-    }
-    out["live_subjects"] = enabled_subjects(topic_flags, subject_flags)
+    out["live_subjects"] = enabled_subjects(topic_flags, {}) - _disabled_subjects(
+        read("disabled_subjects", "")
+    )
     return out
 
 
@@ -180,7 +207,7 @@ def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
     verdict = classify(
         text,
         extra_trigger_phrases=settings["extra_trigger_phrases"],
-        extra_skip_phrases=settings["extra_skip_phrases"],
+        extra_skip_phrases=settings["exempt_patterns"],
         live_subjects=settings["live_subjects"],
     )
     quiet = platform in settings["quiet_platforms"]
@@ -214,11 +241,19 @@ def on_post_tool_call(tool_name: str = "", session_id: str = "", **_kw):
 
 
 def on_transform_llm_output(response_text: str = "", session_id: str = "", **_kw):
-    """Stamp a reply that needed research and did not get any."""
+    """Stamp a reply that needed research and did not get any.
+
+    A turn that fired only because the user explicitly asked for a search gets the directive
+    but no footer by default: the user asked, so a warning is the plugin nagging about a
+    promise it kept. `nag_on_explicit` turns that footer back on.
+    """
     turn = _TURNS.get(session_id)
     if not turn or not turn.get("research") or turn.get("searched") or turn.get("stamped"):
         return None
-    if turn.get("quiet") or not _settings()["enabled"]:
+    settings = _settings()
+    if turn.get("quiet") or not settings["enabled"]:
+        return None
+    if not turn.get("subjects") and not settings["nag_on_explicit"]:
         return None
     if not response_text:
         return None
