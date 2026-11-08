@@ -36,9 +36,9 @@ SKIP_PATTERNS = [
     # this installation, the box, the fleet
     r"\b\d{1,3}(?:\.\d{1,3}){3}\b",              # IP addresses
     r"\b(localhost|ssh|scp|tailscale|ping|systemctl|journalctl|docker|pct|proxmox)\b",
-    r"\b(hermes|cron|gateway|plugin|kanban|profile|skill|session|dashboard|mcp)\b",
+    r"\b(cron|gateway|plugin|kanban|profile|skill|session|dashboard)\b",
     r"/(?:root|mnt|etc|proc|var|opt|home|tmp|usr)/",  # filesystem paths
-    r"\b(disk|ram|cpu|gpu|vram|port \d+|service|unit|process|pid|log ?file)\b",
+    r"\b(service|unit|process|pid|log ?file)\b",
     # personal record and family: recall of our own history, not the state of the world.
     # Entitlement *rules* stay researchable through the law topic; the claim packet does not.
     r"\b(sarah|violet|jackson|troop|scout|school|iep|va claim|appointment|"
@@ -70,6 +70,23 @@ CORE_PATTERNS = [
     # how-to and where-to: asking for instructions is asking for an external artifact
     r"\b(how do i|how to|how does|where can i|where do i|does .* support|is it possible)\b",
 ]
+
+# Hardware-resource words are a local-inventory signal only when nothing else says otherwise:
+# "what's the best local model for 8GB of VRAM" is a question about models, and the word VRAM
+# must not bury it. So this list is checked separately, and an AI match cancels it.
+RESOURCE_SKIP = r"\b(disk|ram|cpu|gpu|vram|port \d+)\b"
+
+
+def _resource_is_the_subject(text: str) -> bool:
+    """True when the message is about this machine's resources, not about a model's needs."""
+    if not re.search(RESOURCE_SKIP, text, re.IGNORECASE):
+        return False
+    for subject in TOPICS[0].subjects:  # the AI topic
+        for pattern in subject.patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return False
+    return True
+
 
 # A bare acknowledgement is the one message that is never a request, however it is phrased.
 BARE_ACK_RE = re.compile(
@@ -106,7 +123,9 @@ _OPENER_RE = re.compile(
     r"research)\b"
     # `which` opens a real question ("which modpack version") but also a relative clause
     # ("which sucks"); only the first kind is a request.
-    r"|^\W*which\b(?!\s+(?:is|was|sucks|means|makes|would|could|has|had|i|we|they|he|she)\b)",
+    r"|^\W*which\b(?!\s+(?:is|was|sucks|means|makes|would|could|has|had|i|we|they|he|she)\b)"
+    # A superlative-leading fragment is a request for a recommendation: "best model for coding".
+    r"|^\W*(?:best|cheapest|fastest|top|recommended)\b",
     re.IGNORECASE,
 )
 
@@ -233,6 +252,8 @@ def classify(
         for pattern in SKIP_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
                 return Verdict(False, f"local-or-personal:{pattern[:24]}")
+        if _resource_is_the_subject(text):
+            return Verdict(False, "local-or-personal:resource")
         if not _is_request(text):
             return Verdict(False, "no-request")
 

@@ -68,6 +68,33 @@ def _subject(topic: str, key: str, label: str, *patterns: str) -> Subject:
 
 TOPICS: tuple[Topic, ...] = (
     Topic(
+        key="ai",
+        label="AI, models and harnesses",
+        blurb="Model names, versions and coding harnesses, which change monthly.",
+        subjects=(
+            _subject(
+                "ai", "models", "AI: models and versions",
+                r"\b(llms?|language models?|(?:local|which|best|this|that) models?|"
+                r"gpt-?\d[\w.]*|claude[\w.]*|gemini[\w.]*|"
+                r"deepseek[\w.]*|qwen[\w.]*|llama[\w.]*|mistral[\w.]*|kimi[\w.]*|glm[\w.]*|"
+                r"nemotron[\w.]*|minimax[\w.]*|grok[\w.]*|context window|"
+                r"quant(?:ization|ized|s)?|gguf|safetensors|mixture[- ]of[- ]experts|"
+                r"reasoning model|multimodal model)\b",
+            ),
+            _subject(
+                "ai", "harnesses", "AI: coding harnesses",
+                r"\b(harness|harnesses|opencode|claude code|codex cli|aider|cursor|cline|"
+                r"swe-?bench|agent framework|tool-calling model)\b",
+            ),
+            _subject(
+                "ai", "agents", "AI: agents and protocols",
+                r"\b(mcp|model context protocol|tool calling|function calling|"
+                r"prompt caching|rag\b|retrieval[- ]augmented|fine[- ]?tun\w*|lora|rlhf|"
+                r"agent loop|system prompt)\b",
+            ),
+        ),
+    ),
+    Topic(
         key="freshness",
         label="Freshness",
         blurb="Wording that means the answer may have moved since the model learned it.",
