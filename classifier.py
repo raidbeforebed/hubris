@@ -1,4 +1,4 @@
-"""Turn classification for source-first.
+"""Turn classification for hubris.
 
 One job: decide whether a user message turns on facts that live outside this machine and
 outside the model's weights. Deterministic regex work, no model call, no network.

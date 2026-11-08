@@ -1,12 +1,24 @@
-# source-first
+# HUBRIS
+
+**H**euristic **U**nverified-**B**elief **R**esearch **I**njection **S**ignal
 
 A Hermes Agent plugin that makes **live web research the default before a factual answer**, and
 makes the failure visible when it does not happen.
 
-Written because an instruction in a profile loses to whatever skill or habit is closest at hand.
-An agent with a large context and a confident voice will answer "what is the best X right now"
-from its training data or a local archive, and be wrong in a way that reads exactly like being
-right. Making that a preference did not fix it. A hook does, because a hook does not negotiate.
+> It knows what it knew.
+
+## The problem the name is pointing at
+
+A model is not usually wrong about the world. It is wrong about *when* it is right. Everything it
+learned was true when it was learned, and none of it carries a date. Past the training cutoff that
+knowledge is at best **undated** and at worst **OBE — overtaken by events**: the price moved, the
+version shipped, the law changed, the pack updated. The answer still arrives in the same confident
+voice, which is why it reads exactly like a current fact.
+
+That is hubris in the original sense: not ignorance, but confidence outrunning its evidence.
+
+An instruction in a profile does not fix it, because an instruction loses to whatever skill or habit
+is closest at hand. A hook does, because a hook does not negotiate.
 
 ## What it does
 
@@ -14,36 +26,30 @@ right. Making that a preference did not fix it. A hook does, because a hook does
 |---|---|
 | `pre_llm_call` | Classifies the turn. When it turns on current external facts, injects a directive: search first, label anything from a fallback, cite the URLs read. |
 | `post_tool_call` | Records whether a live web tool actually fired, per session. |
-| `transform_llm_output` | If the turn needed research and none ran, appends a visible footer: *no live web search ran, treat this as background knowledge*. |
+| `transform_llm_output` | If the turn needed research and none ran, appends a visible footer: *potentially OBE, undated background knowledge, not verified current fact*. |
 
-Deterministic. Standard library only. **No LLM calls, no network of its own**, so it cannot slow
-a turn or spend tokens.
+Deterministic. Standard library only. **No LLM calls, no network of its own**, so it cannot slow a
+turn or spend tokens.
 
 ## Why a footer, and not a block
 
 A block on the final answer is the obvious design and the wrong one: it turns a classification
-mistake into a stuck turn, and the classifier is a heuristic. The footer is unmissable to the
-person reading the reply, costs nothing when the classifier is right, and cannot loop.
+mistake into a stuck turn, and the classifier is a heuristic. The footer is unmissable to the person
+reading the reply, costs nothing when the classifier is right, and cannot loop.
 
 The directive is what changes behaviour; the footer is the tripwire that tells you the directive
 was ignored.
 
 ## Install
 
-From the catalog, once listed:
-
 ```bash
-hermes plugins install source-first --enable
+git clone https://github.com/raidbeforebed/hubris ~/.hermes/plugins/hubris
+hermes plugins validate ~/.hermes/plugins/hubris   # manifest, load, hooks, scan
+hermes plugins doctor hubris                       # must report 3 hooks registered
+hermes plugins enable hubris                       # hot-reloads hooks into the gateway
 ```
 
-From this repository:
-
-```bash
-git clone https://github.com/raidbeforebed/source-first ~/.hermes/plugins/source-first
-hermes plugins validate ~/.hermes/plugins/source-first   # manifest, load, hooks, scan
-hermes plugins doctor source-first                       # must report 3 hooks registered
-hermes plugins enable source-first                       # hot-reloads hooks into the gateway
-```
+Once it is listed in the catalog, the short form is `hermes plugins install hubris --enable`.
 
 Verify it end to end, do not assume:
 
@@ -56,12 +62,12 @@ The answer should cite URLs it actually read. If it does not, the reply carries 
 ## Settings
 
 The manifest declares a `config_schema`, so the **Desktop app renders a form automatically** at
-Settings, Plugins, source-first (and the gear on its row in Capabilities, Plugins). No Desktop
-code is involved. Values are written to `plugins.entries.source-first.settings.*` in
-`config.yaml`, so the same settings are reachable from a terminal:
+Settings, Plugins, hubris (and the gear on its row in Capabilities, Plugins). No Desktop code is
+involved. Values are written to `plugins.entries.hubris.settings.*` in `config.yaml`, so the same
+settings are reachable from a terminal:
 
 ```bash
-hermes config set plugins.entries.source-first.settings.enabled false
+hermes config set plugins.entries.hubris.settings.enabled false
 ```
 
 | Key | Type | Default | Meaning |
@@ -139,13 +145,18 @@ Read these before forking:
 ## Tests
 
 ```bash
-python3 test_source_first.py     # exits 1 on failure
+python3 test_hubris.py     # exits 1 on failure
 ```
 
-60 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers
+61 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers
 the classification table (including every phrase that used to misfire), which tools count as
 research, directive and footer behaviour, per-session ledger isolation, the settings form path,
 quiet platforms, and both user phrase lists.
+
+## History
+
+Named `source-first` up to 1.1.0. Renamed **HUBRIS** in 1.2.0, so the plugin id, the settings path
+(`plugins.entries.hubris.settings`) and the footer label all changed with it.
 
 ## License
 

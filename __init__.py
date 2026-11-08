@@ -1,10 +1,13 @@
-"""source-first: research the live web before answering from memory.
+"""hubris: research the live web before answering from memory.
+
+HUBRIS -- Heuristic Unverified-Belief Research Injection Signal.
 
 Why this exists: an agent with a large context and a confident voice will answer a
 "what is the best X right now" question out of its training data or a local archive, and
-be wrong in a way that reads exactly like being right. Instructions to search first are
-advisory, and an advisory loses to whatever skill or habit is closest at hand. This is the
-mechanical version:
+be wrong in a way that reads exactly like being right. The knowledge was true when it was
+learned; nothing about it carries a date. Past the training cutoff it is at best undated and
+at worst OBE -- overtaken by events. Instructions to search first are advisory, and an
+advisory loses to whatever skill or habit is closest at hand. This is the mechanical version:
 
   pre_llm_call        classify the turn; if it turns on current external facts, inject a
                       directive that says search first and label everything else.
@@ -19,6 +22,8 @@ degrades to silence, never to a stuck turn.
 Settings come from the plugin's own ``config_schema`` entry, which the Desktop app renders
 as a form under Settings, Plugins. Nothing is read from a file in this directory: an update
 replaces the plugin tree, and a config written there would be the one thing users lose.
+
+Formerly named source-first.
 """
 
 from __future__ import annotations
@@ -27,28 +32,29 @@ import logging
 
 from .classifier import classify, counts_as_research
 
-log = logging.getLogger("plugins.source-first")
+log = logging.getLogger("plugins.hubris")
 
 # session_id -> {"research": bool, "searched": bool, "reason": str, "stamped": bool,
-#                "platform": str, "quiet": bool, "footer": bool}
+#                "platform": str, "quiet": bool}
 _TURNS: dict[str, dict] = {}
 
 # Set by register(); the context is the documented route to this plugin's own settings.
 _CTX = None
 
 _DIRECTIVE = (
-    "[source-first] This turn turns on current external facts. Search the live web before "
+    "[hubris] This turn turns on current external facts. Search the live web before "
     "answering: web_search first, then web_extract on the pages that matter. Local archives, "
-    "stored notes and your own training are FALLBACKS, and anything taken from them must be "
-    "labelled as not verified against a live source. Cite the URLs you actually read. If the "
-    "network is blocked, say plainly that you could not reach a source rather than answering "
-    "as though you had."
+    "stored notes and your own training are FALLBACKS: they may be past their date or OBE "
+    "(overtaken by events), so anything taken from them must be labelled as not verified "
+    "against a live source. Cite the URLs you actually read. If the network is blocked, say "
+    "plainly that you could not reach a source rather than answering as though you had."
 )
 
 _FOOTER = (
     "\n\n---\n"
-    "**source-first:** this turn asked about current external facts and no live web search "
-    "ran. Treat this answer as background knowledge, not verified current fact."
+    "**hubris:** this turn asked about current external facts and no live web search ran. "
+    "Treat the answer above as potentially OBE (overtaken by events): undated background "
+    "knowledge, not verified current fact."
 )
 
 _DEFAULTS = {
@@ -62,9 +68,9 @@ _DEFAULTS = {
 def _settings() -> dict:
     """This plugin's settings, fail-open.
 
-    ``ctx.get_config`` reads ``plugins.entries.source-first.settings.<key>``, which is what
-    the Desktop form and ``hermes config set`` write. Without a context (unit test, CLI
-    probe) the defaults stand, so the hooks never fail on configuration.
+    ``ctx.get_config`` reads ``plugins.entries.hubris.settings.<key>``, which is what the
+    Desktop form and ``hermes config set`` write. Without a context (unit test, CLI probe)
+    the defaults stand, so the hooks never fail on configuration.
     """
     getter = getattr(_CTX, "get_config", None)
     if not callable(getter):
@@ -128,7 +134,7 @@ def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
     if not verdict.research or quiet:
         return None
 
-    log.info("source-first: research directive injected (%s, %s)", session_id[:12], verdict.reason)
+    log.info("hubris: research directive injected (%s, %s)", session_id[:12], verdict.reason)
     return {"context": _DIRECTIVE}
 
 
@@ -155,7 +161,7 @@ def on_transform_llm_output(response_text: str = "", session_id: str = "", **_kw
         return None
 
     turn["stamped"] = True
-    log.warning("source-first: research turn %s answered without a web search (%s)",
+    log.warning("hubris: research turn %s answered without a web search (%s)",
                 session_id[:12], turn.get("reason"))
     return response_text + _FOOTER
 
@@ -166,4 +172,4 @@ def register(ctx) -> None:  # noqa: ANN001 - PluginContext
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
     ctx.register_hook("post_tool_call", on_post_tool_call)
     ctx.register_hook("transform_llm_output", on_transform_llm_output)
-    log.info("source-first: registered (search-first directive + missing-search footer)")
+    log.info("hubris: registered (search directive + missing-search footer)")
