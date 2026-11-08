@@ -65,10 +65,26 @@ SKIP_PATTERNS = [
 CORE_PATTERNS = [
     # an explicit request to go and find something, or a link to go and read
     r"(\b(look (?:it |this |that )?up|looking for|find out|search (?:for|online|the web)|"
-    r"can you (?:find|look|check|search|see if)|research|sources? for)\b|https?://)",
+    r"web search|check online|search online|go find|can you (?:find|look|check|search|see if)|"
+    r"research|sources? for)\b|https?://)",
     # how-to and where-to: asking for instructions is asking for an external artifact
     r"\b(how do i|how to|how does|where can i|where do i|does .* support|is it possible)\b",
 ]
+
+# A bare acknowledgement is the one message that is never a request, however it is phrased.
+BARE_ACK_RE = re.compile(
+    r"^\s*(?:yes|no|ok|okay|sure|thanks|thank you|do it|go ahead|continue|stop|"
+    r"proceed|retry|again)[.!]*\s*$",
+    re.IGNORECASE,
+)
+
+# A complaint about the agent's searching is not a request to search. Checked before CORE,
+# because the sentence contains the very words CORE looks for ("you never search online").
+COMPLAINT_RE = re.compile(
+    r"\b(?:you never|you didn'?t|why didn'?t you|why did you not|my complaint|"
+    r"i complained|stop guessing|stop searching)\b",
+    re.IGNORECASE,
+)
 
 
 QUESTION_SHAPE = re.compile(r"\?")
@@ -186,27 +202,39 @@ def classify(
     if not text.strip():
         return Verdict(False, "empty")
 
-    for pattern in _user_phrases(extra_skip_phrases) + SKIP_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
-            return Verdict(False, f"local-or-personal:{pattern[:24]}")
+    # A bare acknowledgement is never a request, whatever else it might match.
+    if BARE_ACK_RE.match(text):
+        return Verdict(False, "acknowledgement")
 
-    # A phrase the user taught the plugin is an explicit opt-in, so it does not have to pass
-    # the built-in shape test: "kubernetes pod stuck" is a fragment, but the user said this
-    # domain is researchable and that judgment outranks the heuristic.
+    # A phrase the user taught the plugin is an explicit opt-in, and their never-list is an
+    # explicit opt-out. Both outrank everything below.
+    for pattern in _user_phrases(extra_skip_phrases):
+        if re.search(pattern, text, re.IGNORECASE):
+            return Verdict(False, f"user-skip:{pattern[:24]}")
     for pattern in _user_phrases(extra_trigger_phrases):
         if re.search(pattern, text, re.IGNORECASE):
             return Verdict(True, "user-phrase:" + pattern[:24], ("user",))
 
-    # CORE is an explicit request by definition, so it does not need the clause gate. A pasted
-    # URL counts as one: the user handed over a link to read.
+    # A complaint about searching mentions searching; it is not a request to search.
+    if COMPLAINT_RE.search(text):
+        return Verdict(False, "complaint")
+
+    # CORE is an explicit request by definition, so it needs neither the clause gate nor the
+    # local-domain skip list. This ordering is the whole point: "did you check online whether
+    # other Hermes users hit this?" is research, and a skip rule on the word "hermes" must not
+    # swallow it. Measured on 77 real directives, skipping first cost 42% recall.
     core_hits = []
     for pattern in CORE_PATTERNS:
         m = re.search(pattern, text, re.IGNORECASE)
         if m:
             core_hits.append(m.group(0).strip())
 
-    if not core_hits and not _is_request(text):
-        return Verdict(False, "no-request")
+    if not core_hits:
+        for pattern in SKIP_PATTERNS:
+            if re.search(pattern, text, re.IGNORECASE):
+                return Verdict(False, f"local-or-personal:{pattern[:24]}")
+        if not _is_request(text):
+            return Verdict(False, "no-request")
 
     hits: list[str] = list(core_hits)
     subjects: list[str] = []

@@ -1,5 +1,5 @@
 name: hubris
-version: "1.5.0"
+version: "1.6.0"
 description: >-
   HUBRIS: Heuristic Unverified-Belief Research Injection Signal. Makes live web research the
   default before any factual answer. Classifies each turn, injects a search directive when the
