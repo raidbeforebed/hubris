@@ -1,13 +1,13 @@
 name: hubris
-version: "1.2.1"
+version: "1.4.0"
 description: >-
   HUBRIS: Heuristic Unverified-Belief Research Injection Signal. Makes live web research the
   default before any factual answer. Classifies each turn, injects a search directive when the
   question turns on current external facts, records whether a real web tool was actually used,
   and stamps the reply when none was, because knowledge past a training cutoff is at best
-  undated and at worst overtaken by events. Stored data, local archives and model training are
-  treated as fallbacks that must be labelled as such. Deterministic: no LLM calls, standard
-  library only.
+  undated and at worst overtaken by events. A taxonomy of ten topics and nineteen subjects
+  decides what counts as current external facts, every one of them is a switch, and the footer
+  names the subject that fired. Deterministic: no LLM calls, standard library only.
 author: raidbeforebed
 kind: standalone
 requires_hermes: ">=0.22.0"
@@ -21,26 +21,203 @@ config_schema:
     default: true
     label: Enable hubris
     description: Turn the behaviour off without disabling or removing the plugin.
+  extra_trigger_phrases:
+    type: str
+    default: ""
+    label: Always research these
+    description: >-
+      Phrases that always mean "check the live web", separated by commas or one per line, for
+      topics the taxonomy does not cover. These bypass both the taxonomy and the question-shape
+      test. Leave empty for none.
+  extra_skip_phrases:
+    type: str
+    default: ""
+    label: Never research these
+    description: >-
+      Phrases that must never trigger research, comma separated. These win over every topic,
+      subject and phrase. Leave empty for none.
   quiet_platforms:
     type: str
     default: ""
     label: Quiet platforms
     description: >-
-      Platform names where no directive is injected and no footer is appended, comma
-      separated. For example: discord_voice, telegram. Leave empty for none.
-  extra_trigger_phrases:
-    type: str
-    default: ""
-    label: Extra research phrases
+      Platforms that get neither the directive nor the footer, comma separated. For example:
+      discord_voice, telegram. Leave empty for none.
+
+  # ---- topics ---------------------------------------------------------------------------
+  # One switch per topic, then a switch per subject inside it. A subject fires only when its
+  # own switch AND its topic's switch are on, so a topic switch is a one-click "all of this".
+  topic_freshness:
+    type: bool
+    default: true
+    label: "Freshness"
     description: >-
-      Phrases that mean "check the live web", on top of the built-in rules, separated by
-      commas or one per line. For example: kubectl, homelab price. Leave empty to use the
-      built-in rules only. Matched case-insensitively as plain text.
-  extra_skip_phrases:
-    type: str
-    default: ""
-    label: Extra never-research phrases
+      Wording that means the answer may have moved since the model learned it. Covers: recency wording.
+  subject_freshness_recency:
+    type: bool
+    default: true
+    label: "Freshness: recency wording"
     description: >-
-      Phrases that must never trigger research, comma separated. These win over every
-      trigger, so this is the safe override for a word the built-in rules misread. Leave
-      empty for none.
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_choices:
+    type: bool
+    default: true
+    label: "Comparisons and picks"
+    description: >-
+      Asking which one, which usually means someone has already compared them. Covers: comparisons and picks.
+  subject_choices_comparison:
+    type: bool
+    default: true
+    label: "Choices: comparisons and picks"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_money:
+    type: bool
+    default: true
+    label: "Money and markets"
+    description: >-
+      Prices, deals and rates, where last month's number is wrong this month. Covers: prices and deals; rates and crypto.
+  subject_money_prices:
+    type: bool
+    default: true
+    label: "Money: prices and deals"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_money_rates:
+    type: bool
+    default: true
+    label: "Money: rates and crypto"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_software:
+    type: bool
+    default: true
+    label: "Software and versions"
+    description: >-
+      Releases, deprecations and docs: the fastest-moving facts an agent can be wrong about. Covers: releases and versions; documentation.
+  subject_software_releases:
+    type: bool
+    default: true
+    label: "Software: releases and versions"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_software_docs:
+    type: bool
+    default: true
+    label: "Software: documentation"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_hardware:
+    type: bool
+    default: true
+    label: "Hardware and gear"
+    description: >-
+      Specs, benchmarks and whether the thing is actually in stock. Covers: specs and reviews; availability.
+  subject_hardware_specs:
+    type: bool
+    default: true
+    label: "Hardware: specs and reviews"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_hardware_stock:
+    type: bool
+    default: true
+    label: "Hardware: availability"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_law:
+    type: bool
+    default: true
+    label: "Law, policy and benefits"
+    description: >-
+      Rules, deadlines and entitlements, all of which move on someone else's schedule. Covers: rules and legality; deadlines and entitlements.
+  subject_law_statutes:
+    type: bool
+    default: true
+    label: "Law: rules and legality"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_law_deadlines:
+    type: bool
+    default: true
+    label: "Law: deadlines and entitlements"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_health:
+    type: bool
+    default: true
+    label: "Health and medicine"
+    description: >-
+      Guidance and alerts, where a stale answer is the expensive kind of wrong. Covers: guidance; recalls and outbreaks.
+  subject_health_guidance:
+    type: bool
+    default: true
+    label: "Health: guidance"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_health_alerts:
+    type: bool
+    default: true
+    label: "Health: recalls and outbreaks"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_local:
+    type: bool
+    default: true
+    label: "Local and logistics"
+    description: >-
+      Weather, hours and roads: true only near you, and only right now. Covers: weather; places and roads.
+  subject_local_weather:
+    type: bool
+    default: true
+    label: "Local: weather"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_local_places:
+    type: bool
+    default: true
+    label: "Local: places and roads"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_games:
+    type: bool
+    default: true
+    label: "Games and modpacks"
+    description: >-
+      The case that started this: a modpack's progression changes every release. Covers: packs and versions; guides and progression; recipes, crafting and wikis.
+  subject_games_versions:
+    type: bool
+    default: true
+    label: "Games: packs and versions"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_games_guides:
+    type: bool
+    default: true
+    label: "Games: guides and progression"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_games_recipes:
+    type: bool
+    default: true
+    label: "Games and food: recipes, crafting and wikis"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  topic_news:
+    type: bool
+    default: true
+    label: "News and current events"
+    description: >-
+      Elections, conflicts and headlines, where the answer changes by the hour. Covers: headlines, elections and officials; world events.
+  subject_news_politics:
+    type: bool
+    default: true
+    label: "News: headlines, elections and officials"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.
+  subject_news_world:
+    type: bool
+    default: true
+    label: "News: world events"
+    description: >-
+      Turn off to stop hubris treating this as a question that needs a live source.

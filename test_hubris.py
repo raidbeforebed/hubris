@@ -7,6 +7,7 @@ No pytest, no fixtures, no network: the plugin is deterministic, so the test is 
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -85,6 +86,52 @@ for text, want in CASES:
     check(f"classify {got!s:5s} {text[:56]}", got is want)
 
 
+# ---------------------------------------------------------------- taxonomy and its switches
+tax = sys.modules["hubris.taxonomy"]
+
+# The manifest and the taxonomy must not drift: every switch declared, none invented.
+manifest_text = (HERE / "plugin.yaml").read_text(encoding="utf-8")
+declared = set(re.findall(r"^  (topic_[a-z_]+|subject_[a-z_]+):", manifest_text, re.M))
+check("every taxonomy switch is declared in the manifest", set(tax.setting_keys()) == declared)
+check("the switch count is the documented one", len(declared) == 29)
+
+# A topic switch is one click for everything inside it.
+everything = tax.all_subject_keys()
+money_off = tax.enabled_subjects({"money": False}, {})
+check(
+    "turning a topic off removes its subjects",
+    "money.prices" not in classifier.classify(
+        "what is the current price of a 4090?", live_subjects=money_off
+    ).subjects,
+)
+prices_off = tax.enabled_subjects({}, {"money.prices": False})
+check(
+    "turning one subject off leaves its sibling live",
+    "money.prices" not in classifier.classify(
+        "what is the current price of a 4090?", live_subjects=prices_off
+    ).subjects,
+)
+
+# With every topic off, vocabulary alone cannot fire; an explicit request still can.
+all_off = tax.enabled_subjects({t.key: False for t in tax.TOPICS}, {})
+check(
+    "every topic off silences a vocabulary question",
+    not classifier.classify(
+        "what is the current price of a 4090?", live_subjects=all_off
+    ).research,
+)
+check(
+    "an explicit request still fires with every topic off",
+    classifier.classify(
+        "can you find the current price of a 4090?", live_subjects=all_off
+    ).research,
+)
+
+# The reason has to name the subject, or the footer cannot teach the setting.
+v = classifier.classify("what is the current modpack version?")
+check("subjects are reported for the footer", bool(v.subjects) and all("." in s for s in v.subjects))
+
+
 # ---------------------------------------------------------------- which tools count
 TOOL_CASES = [
     ("web_search", True),
@@ -131,7 +178,8 @@ def test_hooks() -> None:
     check("directive injected for a research turn", bool(injected and "[hubris]" in injected["context"]))
     out = sf.on_transform_llm_output(response_text="Answer.", session_id="t1")
     check("footer appended when no search ran", bool(out and "no live web search ran" in out))
-    check("footer names the plugin and says OBE", bool(out and "hubris" in out and "OBE" in out))
+    check("footer says the plugin, the subject and OBE",
+          bool(out and "hubris" in out and "OBE" in out and "games." in out))
     check("footer is idempotent", sf.on_transform_llm_output(response_text=out, session_id="t1") is None)
 
     # research turn with a real web search -> no footer

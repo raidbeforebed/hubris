@@ -33,6 +33,7 @@ import logging
 import re
 
 from .classifier import classify, counts_as_research
+from .taxonomy import TOPICS, enabled_subjects
 
 log = logging.getLogger("plugins.hubris")
 
@@ -54,7 +55,7 @@ _DIRECTIVE = (
 
 _FOOTER = (
     "\n\n---\n"
-    "**hubris:** this turn asked about current external facts and no live web search ran. "
+    "**hubris:** this turn turned on {subject} and no live web search ran. "
     "Treat the answer above as potentially OBE (overtaken by events): undated background "
     "knowledge, not verified current fact."
 )
@@ -92,24 +93,64 @@ def _as_phrases(value) -> list[str]:
     return []
 
 
+def _flag(value, default: bool = True) -> bool:
+    """A switch from whatever the config holds: real bool, or a string a hand edit left."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if not text:
+            return default
+        return text not in ("false", "0", "no", "off", "disabled")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return default
+
+
 def _settings() -> dict:
     """This plugin's settings, fail-open.
 
     ``ctx.get_config`` reads ``plugins.entries.hubris.settings.<key>``, which is what the
     Desktop form and ``hermes config set`` write. Without a context (unit test, CLI probe)
-    the defaults stand, so the hooks never fail on configuration.
+    every switch stands at its default -- on -- so the hooks never fail on configuration and
+    a probe sees the full taxonomy rather than an empty one.
     """
+    every_subject = {s.full_key for t in TOPICS for s in t.subjects}
     getter = getattr(_CTX, "get_config", None)
     if not callable(getter):
-        return {k: (v if k == "enabled" else []) for k, v in _DEFAULTS.items()}
-    out = {}
-    for key, default in _DEFAULTS.items():
+        return {
+            "enabled": True,
+            "quiet_platforms": [],
+            "extra_trigger_phrases": [],
+            "extra_skip_phrases": [],
+            "live_subjects": every_subject,
+        }
+
+    def read(key, default):
         try:
-            value = getter(key, default)
+            return getter(key, default)
         except Exception:
-            value = default
-        out[key] = bool(value) if key == "enabled" else _as_phrases(value)
+            return default
+
+    out = {
+        "enabled": _flag(read("enabled", True)),
+        "quiet_platforms": _as_phrases(read("quiet_platforms", "")),
+        "extra_trigger_phrases": _as_phrases(read("extra_trigger_phrases", "")),
+        "extra_skip_phrases": _as_phrases(read("extra_skip_phrases", "")),
+    }
+    topic_flags = {t.key: _flag(read(t.setting_key, True)) for t in TOPICS}
+    subject_flags = {
+        s.full_key: _flag(read(s.setting_key, True)) for t in TOPICS for s in t.subjects
+    }
+    out["live_subjects"] = enabled_subjects(topic_flags, subject_flags)
     return out
+
+
+def _subject_phrase(subjects) -> str:
+    """`money.prices, games.guides` for the footer, or the generic phrase when only shape matched."""
+    if not subjects:
+        return "current external facts"
+    return ", ".join(subjects)
 
 
 def _text_of(user_message) -> str:
@@ -140,12 +181,14 @@ def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
         text,
         extra_trigger_phrases=settings["extra_trigger_phrases"],
         extra_skip_phrases=settings["extra_skip_phrases"],
+        live_subjects=settings["live_subjects"],
     )
     quiet = platform in settings["quiet_platforms"]
     _TURNS[session_id] = {
         "research": verdict.research,
         "searched": False,
         "reason": verdict.reason,
+        "subjects": verdict.subjects,
         "stamped": False,
         "platform": platform,
         "quiet": quiet,
@@ -183,7 +226,7 @@ def on_transform_llm_output(response_text: str = "", session_id: str = "", **_kw
     turn["stamped"] = True
     log.warning("hubris: research turn %s answered without a web search (%s)",
                 session_id[:12], turn.get("reason"))
-    return response_text + _FOOTER
+    return response_text + _FOOTER.format(subject=_subject_phrase(turn.get("subjects")))
 
 
 def register(ctx) -> None:  # noqa: ANN001 - PluginContext
