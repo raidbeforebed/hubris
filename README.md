@@ -73,16 +73,17 @@ hermes config set plugins.entries.hubris.settings.enabled false
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `enabled` | bool | `true` | Turn the behaviour off without disabling or removing the plugin. |
-| `quiet_platforms` | list | `[]` | Platform names (`discord_voice`, `telegram`) that get neither the directive nor the footer. |
-| `extra_trigger_phrases` | list | `[]` | Phrases that mean "check the live web", on top of the built-in rules. |
-| `extra_skip_phrases` | list | `[]` | Phrases that must never trigger research. These win over every trigger. |
+| `quiet_platforms` | text | empty | Platform names that get neither the directive nor the footer, comma separated. `discord_voice, telegram`. |
+| `extra_trigger_phrases` | text | empty | Phrases that mean "check the live web", comma separated or one per line. |
+| `extra_skip_phrases` | text | empty | Phrases that must never trigger research, comma separated. These win over every trigger. |
 
-`list` fields render as a JSON editor, so extending the plugin for your own domain needs no code
-change:
+Empty is a real state, not a missing value: the built-in rules run on their own, and the two
+phrase fields only ever *add* to them. Type `kubectl, homelab price` in the field and it becomes
+two phrases.
 
-```json
-["kubernetes", "homelab price", "my thesis"]
-```
+The stored shape is forgiving on purpose. A comma-separated line, one phrase per line, a JSON
+array (`["kubectl"]`), or a real YAML list all parse to the same thing, so a setting written by
+hand in `config.yaml` is never silently dropped.
 
 Extra trigger phrases bypass the built-in question-shape test, because a phrase you taught the
 plugin is an explicit opt-in. Extra skip phrases are checked before everything else, so they are
@@ -148,7 +149,7 @@ Read these before forking:
 python3 test_hubris.py     # exits 1 on failure
 ```
 
-61 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers
+69 checks, no pytest, no network: the plugin is deterministic, so the test is a table. It covers
 the classification table (including every phrase that used to misfire), which tools count as
 research, directive and footer behaviour, per-session ledger isolation, the settings form path,
 quiet platforms, and both user phrase lists.
@@ -156,7 +157,9 @@ quiet platforms, and both user phrase lists.
 ## History
 
 Named `source-first` up to 1.1.0. Renamed **HUBRIS** in 1.2.0, so the plugin id, the settings path
-(`plugins.entries.hubris.settings`) and the footer label all changed with it.
+(`plugins.entries.hubris.settings`) and the footer label all changed with it. In 1.2.1 the three
+list settings became plain comma-separated text: a JSON editor is a miserable way to type one
+platform name, and an empty JSON box reads as a broken form rather than as "no phrases added".
 
 ## License
 

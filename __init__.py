@@ -28,7 +28,9 @@ Formerly named source-first.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 
 from .classifier import classify, counts_as_research
 
@@ -59,10 +61,35 @@ _FOOTER = (
 
 _DEFAULTS = {
     "enabled": True,
-    "quiet_platforms": [],
-    "extra_trigger_phrases": [],
-    "extra_skip_phrases": [],
+    "quiet_platforms": "",
+    "extra_trigger_phrases": "",
+    "extra_skip_phrases": "",
 }
+
+
+def _as_phrases(value) -> list[str]:
+    """A phrase list from whichever shape the settings ended up holding.
+
+    The form stores a plain string because a comma-separated line is what a person can
+    actually type, but someone editing config.yaml by hand may write a real list, and an
+    older copy of this plugin wrote JSON arrays. All three are accepted so no saved
+    setting is ever silently dropped.
+    """
+    if isinstance(value, (list, tuple, set)):
+        return [str(v).strip() for v in value if str(v).strip()]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, list):
+                return [str(v).strip() for v in parsed if str(v).strip()]
+        return [p.strip() for p in re.split(r"[,\n]", text) if p.strip()]
+    return []
 
 
 def _settings() -> dict:
@@ -74,21 +101,14 @@ def _settings() -> dict:
     """
     getter = getattr(_CTX, "get_config", None)
     if not callable(getter):
-        return dict(_DEFAULTS)
+        return {k: (v if k == "enabled" else []) for k, v in _DEFAULTS.items()}
     out = {}
     for key, default in _DEFAULTS.items():
         try:
             value = getter(key, default)
         except Exception:
             value = default
-        if key == "enabled":
-            out[key] = bool(value)
-        elif isinstance(value, list):
-            out[key] = [v for v in value if isinstance(v, str) and v.strip()]
-        elif isinstance(value, str):
-            out[key] = [value] if value.strip() else []
-        else:
-            out[key] = list(default)
+        out[key] = bool(value) if key == "enabled" else _as_phrases(value)
     return out
 
 

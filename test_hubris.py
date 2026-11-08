@@ -234,6 +234,29 @@ def test_hooks() -> None:
         ).research,
     )
 
+    # a phrase list is accepted in every shape the settings have ever stored
+    parse = sf._as_phrases
+    check("phrases: comma separated", parse("kubectl, homelab price") == ["kubectl", "homelab price"])
+    check("phrases: one per line", parse("kubectl\nhomelab price") == ["kubectl", "homelab price"])
+    check("phrases: a JSON array string", parse('["kubectl", "homelab price"]') == ["kubectl", "homelab price"])
+    check("phrases: a real list", parse(["kubectl", "homelab price"]) == ["kubectl", "homelab price"])
+    check("phrases: empty string is none", parse("") == [])
+    check("phrases: blank entries dropped", parse(" a , , b ") == ["a", "b"])
+    check("phrases: junk is none", parse(None) == [] and parse(42) == [])
+
+    # the form stores a string, so that path must reach the classifier too
+    previous = with_settings(extra_trigger_phrases="kubernetes, terraform")
+    try:
+        check(
+            "a comma-separated setting reaches the classifier",
+            classifier.classify(
+                "kubernetes pod stuck",
+                extra_trigger_phrases=sf._settings()["extra_trigger_phrases"],
+            ).research,
+        )
+    finally:
+        sf._CTX = previous
+
 
 test_hooks()
 
