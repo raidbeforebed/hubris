@@ -1,0 +1,44 @@
+name: source-first
+version: "1.1.0"
+description: >-
+  Makes live web research the default before any factual answer. Classifies each turn,
+  injects a search directive when the question turns on current external facts, records
+  whether a real web tool was actually used, and stamps the reply when none was. Stored
+  data, local archives and model training are treated as fallbacks that must be labelled
+  as such. Deterministic: no LLM calls, standard library only.
+author: raidbeforebed
+kind: standalone
+requires_hermes: ">=0.22.0"
+provides_hooks:
+  - pre_llm_call
+  - post_tool_call
+  - transform_llm_output
+config_schema:
+  enabled:
+    type: bool
+    default: true
+    label: Enable source-first
+    description: Turn the behaviour off without disabling or removing the plugin.
+  quiet_platforms:
+    type: list
+    default: []
+    label: Quiet platforms
+    description: >-
+      Platform names (for example discord_voice) where no directive is injected and no
+      footer is appended. Matched against the platform the turn arrived on.
+  extra_trigger_phrases:
+    type: list
+    default: []
+    label: Extra research phrases
+    description: >-
+      Phrases that mean "check the live web", on top of the built-in rules. Matched
+      case-insensitively as plain text, so no regex escaping is needed. Use a JSON array,
+      for example ["kubectl", "homelab price"].
+  extra_skip_phrases:
+    type: list
+    default: []
+    label: Extra never-research phrases
+    description: >-
+      Phrases that must never trigger research. These win over every trigger, so this is
+      the safe override for a word the built-in rules misread. JSON array, for example
+      ["my thesis", "the draft"].
