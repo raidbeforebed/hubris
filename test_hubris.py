@@ -154,6 +154,31 @@ TOOL_CASES = [
 for name, want in TOOL_CASES:
     check(f"counts_as_research {name} -> {want}", classifier.counts_as_research(name) is want)
 
+# A code tool is judged by what it ran. Observed live: a turn read six pages through
+# execute_code (which imports web_search/web_extract from hermes_tools) and was stamped
+# "no live web search ran", because only the outer tool name was visible.
+CODE_CASES = [
+    ("execute_code", {"code": "from hermes_tools import web_search\nweb_search('atm10 version', limit=5)"}, True),
+    ("execute_code", {"code": "from hermes_tools import web_extract\nweb_extract(['https://a.example/x'])"}, True),
+    ("execute_code", {"code": "import json\nd = json.load(open('/tmp/x.json'))\nprint(sorted(d))"}, False),
+    ("execute_code", {"code": "print('the docs are at https://example.com/docs')"}, False),
+    ("terminal", {"command": "curl -s --max-time 20 https://api.example.com/models -o /tmp/m.json"}, True),
+    ("terminal", {"command": "wget -q https://example.com/feed.xml"}, True),
+    ("terminal", {"command": "ls -la /root && df -h"}, False),
+    ("terminal", {"command": "echo https://example.com"}, False),
+    ("terminal", {"command": "grep -rn 'https://' /etc/hosts"}, False),
+]
+for name, args, want in CODE_CASES:
+    got = classifier.counts_as_research(name, args=args)
+    check(f"code tool {name} {str(args)[:44]!r} -> {want}", got is want)
+
+# Nested argument shapes are walked, not assumed: a later tool may not use code/command.
+check(
+    "nested code arguments are read",
+    classifier.counts_as_research("execute_code", args={"payload": {"script": "web_search('x')"}}),
+)
+check("no arguments means no evidence", classifier.counts_as_research("execute_code", args=None) is False)
+
 
 # ---------------------------------------------------------------- hook behaviour
 class FakeCtx:
@@ -189,6 +214,15 @@ def test_hooks() -> None:
           bool(out and "hubris" in out and "OBE" in out and "games." in out))
     check("footer is idempotent", sf.on_transform_llm_output(response_text=out, session_id="t1") is None)
 
+    # A bare suppression token must never be stamped: the footer would stop the delivery
+    # layer recognising it, turning a silent turn into a visible message.
+    sf.on_pre_llm_call(session_id="t_silent", user_message="what is the best ATM10 guide right now?")
+    check("[SILENT] is left untouched",
+          sf.on_transform_llm_output(response_text="[SILENT]", session_id="t_silent") is None)
+    sf.on_pre_llm_call(session_id="t_silent2", user_message="what is the best ATM10 guide right now?")
+    check("[SILENT] with trailing whitespace is left untouched",
+          sf.on_transform_llm_output(response_text="  [SILENT] \n", session_id="t_silent2") is None)
+
     # research turn with a real web search -> no footer
     sf.on_pre_llm_call(session_id="t2", user_message="what is the current price of a 3080?")
     sf.on_post_tool_call(tool_name="web_search", session_id="t2", result="{}")
@@ -198,6 +232,25 @@ def test_hooks() -> None:
     sf.on_pre_llm_call(session_id="t3", user_message="latest ATM10 version?")
     sf.on_post_tool_call(tool_name="mcp__searxng__searxng_web_search", session_id="t3")
     check("MCP search counts as research", sf.on_transform_llm_output(response_text="x", session_id="t3") is None)
+
+    # Research performed inside a code tool silences the footer too: the hook reads its args.
+    sf.on_pre_llm_call(session_id="t3c", user_message="best model for coding right now")
+    sf.on_post_tool_call(
+        tool_name="execute_code", session_id="t3c",
+        args={"code": "from hermes_tools import web_search, web_extract\nweb_search('x')"},
+    )
+    check(
+        "research inside execute_code silences the footer",
+        sf.on_transform_llm_output(response_text="x", session_id="t3c") is None,
+    )
+
+    # ... and a code tool that never left the machine leaves the footer in place.
+    sf.on_pre_llm_call(session_id="t3d", user_message="best model for coding right now")
+    sf.on_post_tool_call(tool_name="execute_code", session_id="t3d", args={"code": "print(2 + 2)"})
+    check(
+        "local code does not silence the footer",
+        sf.on_transform_llm_output(response_text="x", session_id="t3d") is not None,
+    )
 
     # a local file search is NOT research: the footer must still fire
     sf.on_pre_llm_call(session_id="t3b", user_message="latest ATM10 version?")
