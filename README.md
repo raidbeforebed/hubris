@@ -22,7 +22,7 @@ hook does not negotiate.
 | Hook | Behaviour |
 |---|---|
 | `pre_llm_call` | Classifies the turn. When the question turns on current facts, it tells the model to search first, label anything from a fallback, and cite the URLs it read. |
-| `post_tool_call` | Records whether a live web tool actually fired, per session. |
+| `post_tool_call` | Records whether the turn actually reached the live web, per session, including research run from inside `execute_code` or `terminal`. |
 | `transform_llm_output` | When the turn needed research and no search ran, appends a footer naming the subject that fired. |
 
 Deterministic. Standard library only. **No LLM calls and no network of its own**, so it cannot slow
@@ -35,6 +35,17 @@ The footer names its own cause, which is what makes the plugin teachable:
 > verified current fact.
 
 If that warning is wrong, it has just told you which switch to reach for.
+
+### What counts as research
+
+A named web tool (`web_search`, `web_extract`, any SearXNG, Perplexica, Brave, Tavily or Firecrawl
+tool, any `browser_`) is its own proof. A code tool is not, because the same `execute_code` call can
+read a hundred pages or add two numbers: what it actually ran is what gets read. A web function
+called from inside the code counts, and so does a raw fetch that carries both a fetching call and an
+http URL. A URL on its own never counts, so code that prints a link cannot silence the warning.
+
+Local search is never research. `search_files` and `session_search` do not satisfy the check, or the
+footer would go quiet on turns that never left the machine.
 
 ## The taxonomy
 
@@ -96,6 +107,25 @@ syntax: a warning naming `money.prices` is telling you what to type.
 
 Unknown ids in `disabled_subjects` get logged and ignored, so a typo costs a warning and not a
 broken turn. The text fields show an example in grey until you type.
+
+### Per profile
+
+Hubris acts in a profile only where it is enabled, and every profile keeps its own topics:
+
+```bash
+hermes -p coder plugins enable hubris
+```
+
+Nothing inherits between profiles, so a profile you enable starts at the defaults above. Set the
+few topics that matter for that profile rather than copying all seventeen by hand: a coding
+profile wants `topic_ai` and `topic_software`, a modpack profile wants `topic_games`.
+
+The Desktop app has a page for exactly this. Settings, Plugins, HUBRIS profiles, Profiles: pick
+the profile to copy from, tick the profiles to copy onto, and press the button. It copies the
+values that source is actually using (never its off switch), turns the plugin on where it is off,
+then reads every target back and tells you what landed. Each profile keeps its own copy
+afterwards, so tune one without touching the rest.
+
 
 The two phrase fields are the escape hatch: a domain the topics miss, and a word the rules misread.
 Both accept comma-separated text, one phrase per line, a JSON array, or a YAML list.
@@ -195,7 +225,7 @@ in one line.
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.
 - **Works on stock Hermes.** Everything above is plugin code: the classification, the hooks, the
   taxonomy, all seventeen settings rows. Verified against an unpatched checkout, where the suite
-  passes 84 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
+  passes 99 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
   "config schema: shape valid".
 - `placeholder` in the manifest is optional polish. A backend that passes it through shows an
   example in grey while a field is empty; one that does not ignores the key and renders an empty
@@ -204,8 +234,9 @@ in one line.
   instructions.
 - `transform_llm_output` takes the first non-empty string any plugin returns, so do not run two
   plugins that rewrite replies. If you also use a citation checker, run one of them.
-- Local search is not web research. `search_files` and `session_search` deliberately do not satisfy
-  the check, or the footer would go quiet on turns that never left the machine.
+- Local search is not web research, and neither is a code tool by name alone. Both rules exist so
+  the footer stays honest in both directions: silent when the turn really read the web, loud when it
+  did not. See "What counts as research".
 
 ## Prior art
 
@@ -223,10 +254,10 @@ python3 test_hubris.py     # exits 1 on failure
 python3 eval.py            # precision and recall over the corpus
 ```
 
-84 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
+99 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
 table. It covers the classification table, the taxonomy switches, manifest drift, which tools count
-as research, the directive and footer rules, per-session ledger isolation, the settings path, quiet
-platforms, and both phrase fields.
+as research (including what a code tool actually ran), the directive and footer rules, per-session
+ledger isolation, the settings path, quiet platforms, and both phrase fields.
 
 ## History
 
@@ -235,7 +266,11 @@ comma-separated text, because a JSON editor is a poor way to type one platform n
 JSON box reads as a broken form. In 1.4.0 the flat trigger list became the taxonomy. In 1.6.0 an
 explicit request was made to outrank the skip list, after the 77-message replay. In 1.7.0 nineteen
 subject switches became one `disabled_subjects` field. In 1.8.0 the taxonomy gained the AI topic,
-the text fields gained examples, and the form fields got a visible edge in dark mode.
+the text fields gained examples, and the form fields got a visible edge in dark mode. In 1.8.2 the
+search ledger learned to see research performed inside a code tool: a live probe read six pages
+through `execute_code` and the footer called it unresearched, which is the one way a warning like
+this loses its authority. The same release stops a `[SILENT]` reply from being stamped, and adds the
+per-profile page in the Desktop app.
 
 ## License
 

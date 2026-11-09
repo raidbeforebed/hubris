@@ -291,6 +291,28 @@ WEB_TOOL_HINTS = (
     "browser_", "google_search", "duckduckgo", "wikipedia",
 )
 
+# Tools that run arbitrary code. The agent reaches the live web from inside them too:
+# `execute_code` imports web_search and web_extract from hermes_tools, and `terminal` runs curl.
+# The outer tool NAME therefore says nothing about whether the turn was researched. Observed
+# live on 2026-11-09: a turn that read six pages through execute_code came back stamped "no live
+# web search ran", which is exactly how a warning loses its authority. Their arguments are read
+# instead. See `counts_as_research`.
+CODE_TOOL_HINTS = ("execute_code", "terminal", "run_command", "shell", "bash", "python", "node")
+
+# A web function called from inside code: the call itself is the evidence, so no URL is needed.
+_CODE_WEB_CALLS = (
+    "web_search(", "web_extract(", "web_url_read(", "websearch(", "search_web(",
+    "searxng_web_search(", "perplexica_search(", "brave_web_search(", "brave_search(",
+    "tavily", "exa_search(", "firecrawl", "jina_reader",
+)
+
+# A raw fetch has to show both halves: a fetching call or command AND an http URL. Code that
+# merely prints or echoes a link is not research, because a false "researched" verdict silences
+# the footer on an answer nobody checked, and that is the one failure this plugin exists to stop.
+_FETCH_CALLS = ("urlopen(", "requests.get(", "requests.post(", "httpx.", "aiohttp.", "http.get(")
+_FETCH_COMMANDS = ("curl", "wget", "aria2c", "lynx", "links")
+_URL_RE = re.compile(r"https?://", re.IGNORECASE)
+
 # Local search is not web research. `search_files` is a ripgrep over the disk and
 # `session_search` reads the local session DB; both used to satisfy the old "search"
 # substring test, which silenced the footer on turns that never left the machine.
@@ -300,8 +322,47 @@ LOCAL_SEARCH_HINTS = (
 )
 
 
-def counts_as_research(tool_name: str, result: object = None) -> bool:
-    """True when a tool call actually reached the live web."""
+def _args_text(args: object) -> str:
+    """Every string inside a tool's arguments, flattened.
+
+    `execute_code` carries ``{"code": ...}``, `terminal` carries ``{"command": ...}``, and a
+    later tool may nest them, so walk the structure instead of assuming one key.
+    """
+    if args is None:
+        return ""
+    if isinstance(args, str):
+        return args
+    if isinstance(args, dict):
+        return "\n".join(_args_text(value) for value in args.values())
+    if isinstance(args, (list, tuple, set)):
+        return "\n".join(_args_text(value) for value in args)
+    return str(args)
+
+
+def _code_reaches_web(args: object) -> bool:
+    """True when a code tool's arguments show it fetched from the live web.
+
+    Two shapes count: a web function imported or called from inside the code (the name is the
+    proof), and a raw fetch that carries both a fetching verb and an http URL. A URL on its own
+    never counts, so code that prints a link cannot silence the footer.
+    """
+    text = _normalise(_args_text(args))
+    if not text:
+        return False
+    if any(marker in text for marker in _CODE_WEB_CALLS):
+        return True
+    if not _URL_RE.search(text):
+        return False
+    if any(call in text for call in _FETCH_CALLS):
+        return True
+    return any(re.search(rf"\b{command}\b", text) for command in _FETCH_COMMANDS)
+
+
+def counts_as_research(tool_name: str, args: object = None, result: object = None) -> bool:
+    """True when a tool call actually reached the live web.
+
+    A code tool is judged by what it ran, not by its name; a named web tool is its own proof.
+    """
     name = _normalise(tool_name)
     if not name:
         return False
@@ -309,7 +370,11 @@ def counts_as_research(tool_name: str, result: object = None) -> bool:
         return False
     if name.startswith("research_guard_"):
         return False  # a different plugin's bookkeeping tools
-    return any(hint in name for hint in WEB_TOOL_HINTS)
+    if any(hint in name for hint in WEB_TOOL_HINTS):
+        return True
+    if any(hint in name for hint in CODE_TOOL_HINTS):
+        return _code_reaches_web(args)
+    return False
 
 
 def resolve_subjects(topic_flags: dict[str, bool], subject_flags: dict[str, bool]) -> set[str]:

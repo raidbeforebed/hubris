@@ -228,12 +228,16 @@ def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
     return {"context": _DIRECTIVE}
 
 
-def on_post_tool_call(tool_name: str = "", session_id: str = "", **_kw):
-    """Mark this session's turn as searched once a live-web tool fires."""
+def on_post_tool_call(tool_name: str = "", session_id: str = "", args=None, **_kw):
+    """Mark this session's turn as searched once a live-web tool fires.
+
+    `args` is passed through because a code tool (`execute_code`, `terminal`) can reach the live
+    web without its name ever saying so; the classifier reads what it actually ran.
+    """
     turn = _TURNS.get(session_id)
     if not turn or not turn.get("research") or turn.get("searched"):
         return None
-    if not counts_as_research(tool_name):
+    if not counts_as_research(tool_name, args=args):
         return None
     turn["searched"] = True
     turn["used"] = tool_name
@@ -256,6 +260,11 @@ def on_transform_llm_output(response_text: str = "", session_id: str = "", **_kw
     if not turn.get("subjects") and not settings["nag_on_explicit"]:
         return None
     if not response_text:
+        return None
+    # Never stamp a suppression token. "[SILENT]" only suppresses delivery while it is the
+    # whole reply: appending this footer makes the delivery layer stop recognising it, so a
+    # deliberately silent turn becomes a visible message and defeats the notification budget.
+    if response_text.strip().splitlines()[0].strip().upper() == "[SILENT]":
         return None
 
     turn["stamped"] = True
