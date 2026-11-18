@@ -121,9 +121,10 @@ hermes config set plugins.entries.hubris.settings.disabled_subjects "money.price
 | `disabled_subjects` | text | empty | Mute one subject (`money.prices`) or a whole topic, comma separated. |
 | `exempt_patterns` | text | empty | Never research these, comma separated or one per line. Wins over everything. |
 | `extra_trigger_phrases` | text | empty | Always research these, for a domain the topics miss. |
+| `own_apps` | text | empty | Names of things you built (`my dashboard`), so a question about them is not mistaken for a question about the world. A comparison against the ecosystem still counts as research. |
 | `quiet_platforms` | text | `cron` | Platforms that get no search request and no warning, comma separated. A scheduled job's own brief is not a question you asked, so cron is quiet out of the box; clear the field to act on cron turns too. |
 
-Seventeen rows: eleven topic switches and six controls.
+Eighteen rows: eleven topic switches and seven controls.
 
 Nineteen subject switches existed in an earlier version and came out. The taxonomy is the
 classifier's structure, not a configuration surface, and nobody turns off `money.prices` while
@@ -200,12 +201,13 @@ which switch to reach for when the tripwire was wrong.
 
 ## Measuring it
 
-The numbers are reproducible. `corpus/cases.jsonl` holds 85 labelled turns and `eval.py` scores the
+The numbers are reproducible. `corpus/cases.jsonl` holds 84 labelled turns and `eval.py` scores the
 classifier against them:
 
 ```bash
 python3 eval.py                      # summary, every miss, per-subject tally
 python3 eval.py --show               # every case, pass or fail
+python3 eval.py --no-local           # the published corpus only
 python3 eval.py --min-precision 1.0  # exit 1 below the floor, for CI
 ```
 
@@ -213,15 +215,38 @@ The corpus is paraphrased, not collected. Each case reproduces the shape of a fa
 happened, such as a pasted traceback or a statement that mentions an election, without shipping
 anyone's messages. Cases marked `known_miss` are counted and reported but do not fail the run.
 
-Current: **precision 1.000, recall 1.000** over 85 cases.
+Current: **precision 1.000, recall 1.000** over 84 cases.
 
-Fourteen of those cases came from live traffic rather than from the author's imagination, and they
-were added after an audit of ten days of real turns. That audit is the reason they exist: the corpus
-above scored 1.000 while real traffic was firing on a kanban task body and on "qwen is up and
-running now". A corpus you write from memory cannot find a mistake you have not made yet, which is
-why the practice is to add a case the moment a false positive appears in the wild. The first
-addition dropped precision to 0.980 in public and named the offender, and that is the number
-working as intended rather than the number failing.
+### Your own cases, which never ship
+
+A corpus you write from memory confirms what you already believe. The cases that actually sharpen a
+classifier are the ones drawn from real use, and those are the user's private data, so they do not
+belong in a public repository.
+
+`eval.py` merges a second file, if it exists:
+
+```
+$HERMES_HOME/hubris_corpus.local.jsonl      # default: ~/.hermes/hubris_corpus.local.jsonl
+```
+
+Same one-JSON-object-per-line format, same fields, plus anything the case needs to reproduce its
+conditions (`local_work`, `own_apps`). Cases loaded from there are tagged `local` and the run says
+how many it used. `--no-local` scores the published file alone, which is what a clean clone sees.
+
+```bash
+python3 eval.py --show          # see every case, published and local, with its origin
+```
+
+The file lives beside your config rather than inside the plugin tree, because an update replaces the
+plugin directory and a case from a real conversation is your data, not the project's.
+
+Two habits make this pay off. First, when a wrong footer appears, add the sentence to the local
+file before fixing anything: the case then proves the fix and stops the regression. Second, put any
+name, place or host you would not publish on the denylist at
+`$HERMES_HOME/hubris_pii_denylist.txt`, one term per line. `test_hubris.py` reads it when present
+and fails if any of those terms reaches a shipped file, so a case can be added carelessly and the
+suite still keeps the published tree clean. The denylist itself stays outside the repository for the
+same reason.
 
 Three false positives were fixed at their own site rather than with a longer word list:
 
@@ -267,7 +292,7 @@ in one line.
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.
 - **Works on stock Hermes.** Everything above is plugin code: the classification, the hooks, the
   taxonomy, all seventeen settings rows. Verified against an unpatched checkout, where the suite
-  passes 139 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
+  passes 149 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
   "config schema: shape valid".
 - `placeholder` in the manifest is optional polish. A backend that passes it through shows an
   example in grey while a field is empty; one that does not ignores the key and renders an empty
@@ -296,7 +321,7 @@ python3 test_hubris.py     # exits 1 on failure
 python3 eval.py            # precision and recall over the corpus
 ```
 
-139 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
+149 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
 table. It covers the classification table, the taxonomy switches, manifest drift, which tools count
 as research (including what a code tool actually ran), the directive and footer rules, per-session
 ledger isolation, the settings path, quiet platforms, and both phrase fields.
@@ -325,8 +350,15 @@ showed machine blocks and local-work continuations being scored as if the user h
 378 real turns it removed 16 fires, 10 of them injected blocks that nobody had asked anything, and
 cut the share of fires that produced no research from 19% to 14%. Two human turns that had searched
 were also silenced, both local model and own-app work where silence is correct; that trade is
-recorded as a corpus case so it cannot drift. The corpus grew to 85 with fourteen cases taken
-straight from live traffic.
+recorded as a corpus case so it cannot drift.
+
+1.9.1 is a privacy release, and it is the release that should have been 1.9.0. The first version of
+this release put cases drawn verbatim from the author's own traffic into the public corpus, and the
+classifier hardcoded the author's family names in its skip list. Both were wrong for the same
+reason: a published plugin is not the place for one installation's private vocabulary. Family names
+became a generic kinship rule, own-app names became the `own_apps` setting, and the local corpus
+overlay exists so real-traffic cases can sharpen one installation without ever shipping. The
+structural guard in the test suite keeps the published tree clean from then on.
 
 ## License
 
