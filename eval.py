@@ -57,20 +57,58 @@ def load_cases(path: Path) -> list[dict]:
     return cases
 
 
+def local_corpus_path() -> Path:
+    """Where this installation keeps its own cases.
+
+    Never inside the plugin tree: an update replaces that directory, and a case drawn from a real
+    conversation is the user's data, not the project's. `HERMES_HOME` puts it beside the rest of a
+    profile's private state.
+    """
+    import os
+    home = os.environ.get("HERMES_HOME") or (Path.home() / ".hermes")
+    return Path(home) / "hubris_corpus.local.jsonl"
+
+
+def load_all_cases(published: Path, include_local: bool = True) -> tuple[list[dict], int]:
+    """Published cases plus the installation's own, tagged by origin.
+
+    The published corpus records the shape of a failure and is safe to read and to share. The local
+    file records what actually happened here and is private: it makes this installation's own
+    classifier sharper without ever leaving the machine.
+    """
+    cases = [dict(case, origin="published") for case in load_cases(published)]
+    local = local_corpus_path()
+    count = 0
+    if include_local and local.exists():
+        for case in load_cases(local):
+            case["origin"] = "local"
+            cases.append(case)
+            count += 1
+    return cases, count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--corpus", default=str(HERE / "corpus" / "cases.jsonl"))
     parser.add_argument("--show", action="store_true", help="print every case, not just misses")
+    parser.add_argument("--no-local", action="store_true",
+                        help="score the published corpus alone, ignoring this installation's cases")
     parser.add_argument("--min-precision", type=float, default=None)
     parser.add_argument("--min-recall", type=float, default=None)
     args = parser.parse_args()
 
-    cases = load_cases(Path(args.corpus))
+    cases, n_local = load_all_cases(Path(args.corpus), include_local=not args.no_local)
     live = taxonomy.all_subject_keys()
 
     rows = []
     for case in cases:
-        verdict = classify(case["text"], live_subjects=live)
+        # A case can declare that it happened inside a local-work session, which is the only way
+        # to score the local-vocabulary rule honestly: "qwen is up and running now" is a false
+        # positive in an abstract test and correct silence in the session it actually occurred.
+        verdict = classify(
+            case["text"], live_subjects=live, local_work=bool(case.get("local_work")),
+            own_apps=case.get("own_apps"),
+        )
         expected = bool(case["expect"])
         ok = verdict.research == expected
         missing_subject = []
@@ -93,7 +131,10 @@ def main() -> int:
     recall = len(tp) / (len(tp) + len(fn)) if (tp or fn) else 1.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
 
-    print(f"corpus {len(cases)} cases  ({len(scored)} scored, {len(known)} known-miss)")
+    line = f"corpus {len(cases)} cases  ({len(scored)} scored, {len(known)} known-miss)"
+    if n_local:
+        line += f"  [{len(cases) - n_local} published + {n_local} local from {local_corpus_path()}]"
+    print(line)
     print(f"  fire {len(tp) + len(fp):3d}   correct {len(tp):3d}   wrong {len(fp):3d}")
     print(f"  quiet {len(tn) + len(fn):3d}  correct {len(tn):3d}   wrong {len(fn):3d}")
     print(f"  precision {precision:.3f}   recall {recall:.3f}   f1 {f1:.3f}")

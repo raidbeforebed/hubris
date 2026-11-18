@@ -32,7 +32,7 @@ import json
 import logging
 import re
 
-from .classifier import classify, counts_as_research
+from .classifier import classify, counts_as_research, session_is_local_work
 from .taxonomy import TOPICS, enabled_subjects
 
 log = logging.getLogger("plugins.hubris")
@@ -63,10 +63,11 @@ _FOOTER = (
 _DEFAULTS = {
     "enabled": True,
     "nag_on_explicit": False,
-    "quiet_platforms": "",
+    "quiet_platforms": "cron",
     "extra_trigger_phrases": "",
     "exempt_patterns": "",
     "disabled_subjects": "",
+    "own_apps": "",
 }
 
 
@@ -147,9 +148,10 @@ def _settings() -> dict:
         return {
            "enabled": True,
            "nag_on_explicit": False,
-           "quiet_platforms": [],
+           "quiet_platforms": ["cron"],
            "extra_trigger_phrases": [],
            "exempt_patterns": [],
+           "own_apps": [],
            "live_subjects": every_subject,
         }
 
@@ -159,18 +161,43 @@ def _settings() -> dict:
         except Exception:
            return default
 
+    # Every default here comes from _DEFAULTS, so the value the plugin acts on and the value the
+    # Desktop form shows cannot drift apart. A literal default written at the call site is how
+    # quiet_platforms shipped as "cron" in the manifest and "" at runtime.
     out = {
-        "enabled": _flag(read("enabled", True)),
-        "nag_on_explicit": _flag(read("nag_on_explicit", False)),
-        "quiet_platforms": _as_phrases(read("quiet_platforms", "")),
-        "extra_trigger_phrases": _as_phrases(read("extra_trigger_phrases", "")),
-        "exempt_patterns": _as_phrases(read("exempt_patterns", "")),
+        "enabled": _flag(read("enabled", _DEFAULTS["enabled"])),
+        "nag_on_explicit": _flag(read("nag_on_explicit", _DEFAULTS["nag_on_explicit"])),
+        "quiet_platforms": _as_phrases(read("quiet_platforms", _DEFAULTS["quiet_platforms"])),
+        "extra_trigger_phrases": _as_phrases(
+            read("extra_trigger_phrases", _DEFAULTS["extra_trigger_phrases"])
+        ),
+        "exempt_patterns": _as_phrases(read("exempt_patterns", _DEFAULTS["exempt_patterns"])),
+        "own_apps": _as_phrases(read("own_apps", _DEFAULTS["own_apps"])),
     }
     topic_flags = {t.key: _flag(read(t.setting_key, True)) for t in TOPICS}
     out["live_subjects"] = enabled_subjects(topic_flags, {}) - _disabled_subjects(
-        read("disabled_subjects", "")
+        read("disabled_subjects", _DEFAULTS["disabled_subjects"])
     )
     return out
+
+
+def _starts_with_suppression(response_text: str) -> bool:
+    """True when the reply opens with a delivery-suppression token.
+
+    The delivery layer recognises ``[SILENT]`` as the first thing the reply says. A model
+    often follows it with a line of explanation or a blank line, and stamping a footer onto
+    that reply can stop the token being recognised at all, so the check reads the opening
+    lines instead of line one. Only the top of the reply counts: a ``[SILENT]`` quoted further
+    down is prose about the token, not an attempt to suppress the message.
+    """
+    for line in response_text.strip().splitlines()[:3]:
+        token = line.strip().strip("`*_ ").upper()
+        if not token:
+            continue
+        if token.startswith("[SILENT]") or token.startswith("SILENT"):
+            return True
+        break
+    return False
 
 
 def _subject_phrase(subjects) -> str:
@@ -196,7 +223,8 @@ def _text_of(user_message) -> str:
 # --------------------------------------------------------------------------- hooks
 
 
-def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "", **_kw):
+def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
+                    conversation_history=None, **_kw):
     """Classify the turn, reset its search ledger, and inject the directive when needed."""
     settings = _settings()
     if not settings["enabled"]:
@@ -209,6 +237,10 @@ def on_pre_llm_call(session_id: str = "", user_message=None, platform: str = "",
         extra_trigger_phrases=settings["extra_trigger_phrases"],
         extra_skip_phrases=settings["exempt_patterns"],
         live_subjects=settings["live_subjects"],
+        # The host passes the turn's conversation history, so a session already working on the
+        # machine reads its own vocabulary correctly without the plugin holding any state.
+        local_work=session_is_local_work(conversation_history),
+        own_apps=settings["own_apps"],
     )
     quiet = platform in settings["quiet_platforms"]
     _TURNS[session_id] = {
@@ -261,10 +293,13 @@ def on_transform_llm_output(response_text: str = "", session_id: str = "", **_kw
         return None
     if not response_text:
         return None
-    # Never stamp a suppression token. "[SILENT]" only suppresses delivery while it is the
-    # whole reply: appending this footer makes the delivery layer stop recognising it, so a
-    # deliberately silent turn becomes a visible message and defeats the notification budget.
-    if response_text.strip().splitlines()[0].strip().upper() == "[SILENT]":
+    # Never stamp a suppression token. "[SILENT]" only suppresses delivery while the reply
+    # begins with it, so appending this footer can make the delivery layer stop recognising
+    # it and a deliberately silent turn becomes a visible message, defeating the notification
+    # budget. Check the opening lines rather than line one alone: a model routinely writes
+    # "[SILENT]" and then a sentence of explanation on the next line, and appending the footer
+    # to that reply is the same mistake. A token that is not at the top is ordinary prose.
+    if _starts_with_suppression(response_text):
         return None
 
     turn["stamped"] = True

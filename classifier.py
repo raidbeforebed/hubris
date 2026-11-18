@@ -40,8 +40,14 @@ SKIP_PATTERNS = [
     r"/(?:root|mnt|etc|proc|var|opt|home|tmp|usr)/",  # filesystem paths
     r"\b(service|unit|process|pid|log ?file)\b",
     # personal record and family: recall of our own history, not the state of the world.
-    # Entitlement *rules* stay researchable through the law topic; the claim packet does not.
-    r"\b(wife|husband|spouse|son|daughter|kid|child|family|troop|scout|school|iep|va claim|appointment|"
+    # Kinship rather than a list of first names: a published plugin cannot know whose family it
+    # runs beside, and a hardcoded name list is both useless to anyone else and a privacy leak
+    # for the author. Anyone whose household uses first names adds them to `exempt_patterns`,
+    # which is per-installation and never leaves `config.yaml`.
+    # Entitlement *rules* stay researchable through the law topic; the household records do not.
+    r"\b(my |our )?(wife|husband|spouse|partner|son|daughter|kid|child|children|"
+    r"family|mom|dad|mother|father|brother|sister|grandma|grandpa)\b",
+    r"\b(troop|scout|school|iep|va claim|appointment|"
     r"doctor|prescription|paycheck|shutdown)\b",
     # coding and repo work
     r"\b(repo|repository|commit|branch|diff|patch|refactor|unit test|pytest|traceback|"
@@ -86,6 +92,89 @@ def _resource_is_the_subject(text: str) -> bool:
             if re.search(pattern, text, re.IGNORECASE):
                 return False
     return True
+
+
+# An injected instruction block is machinery, not a question: an async-delegation result, a
+# kanban task body, a background-process notice. These arrive as the "user" message, so without
+# this the plugin scores a machine's text as though the user had typed it. Measured 2026-11-18:
+# two of seventeen no-search fires were exactly this shape.
+_MACHINE_PREAMBLE_RE = re.compile(
+    r"^\s*(?:\[(?:ASYNC DELEGATION|IMPORTANT|OUT-OF-BAND USER MESSAGE|Replying to|System:|"
+    r"The user sent)|# Kanban task\b|\[Replying to:)",
+    re.IGNORECASE,
+)
+
+# Local machine work: the words that make a message about this box, not about the world. The
+# taxonomy owns model names as AI vocabulary, which is right for "which model is better" and wrong
+# for "the local model is up and running now". A continuation turn carries these, so they are only
+# consulted when the session is already doing local work.
+_LOCAL_WORK_RE = re.compile(
+    r"\b(?:llama\.?cpp|llama-server|ollama|vllm|gguf|model load|"
+    # "local <thing>": the words that make a model reference about this box. Model names are public
+    # product names and already live in the taxonomy, so listing them here leaks nothing.
+    r"local ?(?:models?|servers?|instances?|llms?|run|build|"
+    r"qwen|gemma|llama|mistral|glm|kimi|deepseek|phi|nomic)|"
+    r"systemctl|journalctl|ps aux|"
+    r"localhost|127\.0\.0\.1|exit code|stdout|stderr)\b",
+    re.IGNORECASE,
+)
+
+# Tools whose use marks a session as local machine work rather than external research.
+_LOCAL_TOOL_RE = re.compile(
+    r"^(?:read_file|write_file|patch|search_files|terminal|process_manage|"
+    r"local_models|look_at_screen|screen_capture)",
+    re.IGNORECASE,
+)
+
+
+# Asking for a judgement — best, cheapest, compare — is asking for knowledge that lives outside
+# this machine, whatever else the sentence mentions. This is the exception to the local-work rule:
+# "what's the best local model for 8GB of VRAM" is about models, not about our box. Mirrors the
+# reasoning behind `_resource_is_the_subject`.
+_RECOMMEND_RE = re.compile(
+    r"\b(?:best|cheapest|fastest|top|recommended|worth it|"
+    r"compar(?:e|ison)|vs\.?|better|worse)\b",
+    re.IGNORECASE,
+)
+
+
+# Own-app vocabulary comes from the installation, not from the plugin: a published plugin cannot
+# know what its user has built. `own_apps` in the settings supplies the names, and the judgement
+# exemption below still applies, because "review our dashboard for custom components vs existing
+# libraries" is asking what the ecosystem offers and silencing it would be a real loss.
+def _own_app_re(own_apps):
+    """A matcher for this installation's own product names, or None when none are configured."""
+    phrases = _user_phrases(own_apps)
+    if not phrases:
+        return None
+    return re.compile(r"\b(?:" + "|".join(phrases) + r")\b", re.IGNORECASE)
+
+
+def _is_machine_turn(text: str) -> bool:
+    """True when the "user" message is an injected block rather than something typed."""
+    return bool(_MACHINE_PREAMBLE_RE.match(text))
+
+
+def session_is_local_work(history) -> bool:
+    """True when this session is already working on the local machine.
+
+    ``history`` is the turn's ``conversation_history`` as the host passes it: a list of message
+    dicts (or objects with a ``role``). A session counts as local work when it has already used a
+    local tool, or when an earlier turn carried local-machine vocabulary. Used only to decide
+    whether local vocabulary is the subject of the message or just a word inside it.
+    """
+    for message in history or ():
+        role = getattr(message, "role", None)
+        if role is None and isinstance(message, dict):
+            role = message.get("role")
+        if role != "tool":
+            continue
+        name = getattr(message, "tool_name", None)
+        if name is None and isinstance(message, dict):
+            name = message.get("tool_name") or message.get("name")
+        if name and _LOCAL_TOOL_RE.match(str(name)):
+            return True
+    return False
 
 
 # A bare acknowledgement is the one message that is never a request, however it is phrased.
@@ -208,6 +297,8 @@ def classify(
     extra_trigger_phrases=None,
     extra_skip_phrases=None,
     live_subjects: set[str] | None = None,
+    local_work: bool = False,
+    own_apps=None,
 ) -> Verdict:
     """Decide whether this message should be researched before it is answered.
 
@@ -216,10 +307,20 @@ def classify(
     ``topic.subject`` keys; ``None`` means every subject, which is what a probe or a test
     with no settings wants. Skip wins over trigger: "never leave the machine for this" is
     the safer override.
+
+    ``local_work`` says the session is already doing local machine work, so local vocabulary in
+    this message is about this box. It silences a taxonomy match and nothing else: an explicit
+    request in the same message still fires.
     """
     text = _scrub(_normalise(message))
     if not text.strip():
         return Verdict(False, "empty")
+
+    # An injected block is the machinery talking, not the user asking. Checked before everything,
+    # because a delegated task body can name any subject at all and no word list can tell it from
+    # a real question.
+    if _is_machine_turn(message or ""):
+        return Verdict(False, "machine-turn")
 
     # A bare acknowledgement is never a request, whatever else it might match.
     if BARE_ACK_RE.match(text):
@@ -254,8 +355,25 @@ def classify(
                 return Verdict(False, f"local-or-personal:{pattern[:24]}")
         if _resource_is_the_subject(text):
             return Verdict(False, "local-or-personal:resource")
+        # This installation's own apps are local unless the message asks for a judgement about them.
+        own_re = _own_app_re(own_apps)
+        if own_re is not None and own_re.search(text) and not _RECOMMEND_RE.search(text):
+            return Verdict(False, "own-app")
         if not _is_request(text):
             return Verdict(False, "no-request")
+
+    # A session already doing local machine work reads its own vocabulary differently: "qwen is up
+    # and running now" is a status update about this box, not a question about which model is best.
+    # Only the taxonomy match is suppressed, and only when the message carries a local-work word,
+    # no explicit request, and is not asking for a judgement. Measured 2026-11-18: four of
+    # seventeen no-search fires were this shape, and "best local model for 8GB of VRAM" must survive.
+    if (
+        local_work
+        and not core_hits
+        and _LOCAL_WORK_RE.search(text)
+        and not _RECOMMEND_RE.search(text)
+    ):
+        return Verdict(False, "local-work-continuation")
 
     hits: list[str] = list(core_hits)
     subjects: list[str] = []

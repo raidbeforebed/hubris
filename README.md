@@ -25,6 +25,11 @@ hook does not negotiate.
 | `post_tool_call` | Records whether the turn actually reached the live web, per session, including research run from inside `execute_code` or `terminal`. |
 | `transform_llm_output` | When the turn needed research and no search ran, appends a footer naming the subject that fired. |
 
+It also reads the turn, not just the words. An injected block (a delegated result, a kanban card, a
+background-process notice) is machinery and is ignored, and a session already working on the local
+machine reads its own vocabulary correctly: "qwen is up and running now" is a status update, while
+"what is the best local model for 8GB of VRAM" is still a question about the world.
+
 Deterministic. Standard library only. **No LLM calls and no network of its own**, so it cannot slow
 a turn or spend tokens.
 
@@ -46,6 +51,26 @@ http URL. A URL on its own never counts, so code that prints a link cannot silen
 
 Local search is never research. `search_files` and `session_search` do not satisfy the check, or the
 footer would go quiet on turns that never left the machine.
+
+### The turn, not only the words
+
+A message is not always a question someone typed. Three shapes are the same text and want different
+answers, and matching vocabulary alone cannot tell them apart:
+
+| Shape | Example | Answer |
+|---|---|---|
+| **Injected block** | `# Kanban task t_9: update the ATM10 pack to the latest version` | Ignore. Machinery is not a request, however many subject words it carries. |
+| **Local-work continuation** | `qwen is up and running now, will I be able to switch` mid-session | Ignore. The session is working on the box, so its vocabulary is about the box. |
+| **Judgement question** | `what is the best local model for 8GB of VRAM` | Fires, even mid-session. The answer lives in benchmarks, not in the box. |
+
+The local-work rule reads the turn's `conversation_history`, which the host passes to
+`pre_llm_call`, so a session counts as local work once it has used a local tool. That keeps the
+classifier stateless: there is nothing to persist and nothing to reset.
+
+Both suppressions are deliberately narrow. An explicit request always wins, so "can you search
+online whether qwen is still the best local model" fires even inside a local-work session, and the
+judgement words (`best`, `compare`, `vs`, `better`, `cheapest`) protect the questions whose answers
+are genuinely outside the machine.
 
 ## The taxonomy
 
@@ -96,7 +121,7 @@ hermes config set plugins.entries.hubris.settings.disabled_subjects "money.price
 | `disabled_subjects` | text | empty | Mute one subject (`money.prices`) or a whole topic, comma separated. |
 | `exempt_patterns` | text | empty | Never research these, comma separated or one per line. Wins over everything. |
 | `extra_trigger_phrases` | text | empty | Always research these, for a domain the topics miss. |
-| `quiet_platforms` | text | empty | Platforms that get no search request and no warning, comma separated. |
+| `quiet_platforms` | text | `cron` | Platforms that get no search request and no warning, comma separated. A scheduled job's own brief is not a question you asked, so cron is quiet out of the box; clear the field to act on cron turns too. |
 
 Seventeen rows: eleven topic switches and six controls.
 
@@ -136,6 +161,15 @@ A turn that fires because you asked ("look this up") gets the search request and
 you already said what you wanted. A turn that fires because the taxonomy matched gets both. Set
 `nag_on_explicit` if you want the warning anyway.
 
+### Where it does not act at all
+
+`quiet_platforms` defaults to `cron`. A scheduled job's prompt is machinery, not a question, and it
+routinely carries words the taxonomy reads as topics: a wiki sweep that says "research findings",
+"Minecraft" and "Scout troop activities" matches three subjects without anyone having asked for
+anything. Measured here over ten days, a single nightly job produced twelve of the fourteen footers
+the plugin emitted, all on replies nobody reads. The switch is a visible field rather than a hidden
+rule, so a job you do want research on is one cleared field away.
+
 ## Install
 
 ```bash
@@ -166,7 +200,7 @@ which switch to reach for when the tripwire was wrong.
 
 ## Measuring it
 
-The numbers are reproducible. `corpus/cases.jsonl` holds 71 labelled turns and `eval.py` scores the
+The numbers are reproducible. `corpus/cases.jsonl` holds 85 labelled turns and `eval.py` scores the
 classifier against them:
 
 ```bash
@@ -179,7 +213,15 @@ The corpus is paraphrased, not collected. Each case reproduces the shape of a fa
 happened, such as a pasted traceback or a statement that mentions an election, without shipping
 anyone's messages. Cases marked `known_miss` are counted and reported but do not fail the run.
 
-Current: **precision 1.000, recall 1.000** over 71 cases.
+Current: **precision 1.000, recall 1.000** over 85 cases.
+
+Fourteen of those cases came from live traffic rather than from the author's imagination, and they
+were added after an audit of ten days of real turns. That audit is the reason they exist: the corpus
+above scored 1.000 while real traffic was firing on a kanban task body and on "qwen is up and
+running now". A corpus you write from memory cannot find a mistake you have not made yet, which is
+why the practice is to add a case the moment a false positive appears in the wild. The first
+addition dropped precision to 0.980 in public and named the offender, and that is the number
+working as intended rather than the number failing.
 
 Three false positives were fixed at their own site rather than with a longer word list:
 
@@ -225,7 +267,7 @@ in one line.
 - Uses only public hooks. Patches nothing in core, reads no core module, registers no tools.
 - **Works on stock Hermes.** Everything above is plugin code: the classification, the hooks, the
   taxonomy, all seventeen settings rows. Verified against an unpatched checkout, where the suite
-  passes 99 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
+  passes 139 checks and the corpus scores 1.000 / 1.000, and `hermes plugins validate` reports
   "config schema: shape valid".
 - `placeholder` in the manifest is optional polish. A backend that passes it through shows an
   example in grey while a field is empty; one that does not ignores the key and renders an empty
@@ -254,7 +296,7 @@ python3 test_hubris.py     # exits 1 on failure
 python3 eval.py            # precision and recall over the corpus
 ```
 
-99 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
+139 unit checks, no pytest and no network, because the plugin is deterministic and the test is a
 table. It covers the classification table, the taxonomy switches, manifest drift, which tools count
 as research (including what a code tool actually ran), the directive and footer rules, per-session
 ledger isolation, the settings path, quiet platforms, and both phrase fields.
@@ -271,6 +313,20 @@ search ledger learned to see research performed inside a code tool: a live probe
 through `execute_code` and the footer called it unresearched, which is the one way a warning like
 this loses its authority. The same release stops a `[SILENT]` reply from being stamped, and adds the
 per-profile page in the Desktop app.
+
+In 1.8.3 two faults found by auditing ten days of real traffic came out. `cron` is quiet by default,
+because a scheduled job's brief is not a question and one nightly wiki sweep was producing most of
+the footers the plugin emitted. And the `[SILENT]` guard now reads the opening lines instead of line
+one, because a model that writes `[SILENT]` and then a line of explanation was still getting the
+footer appended, which is exactly how a suppression token stops being recognised.
+
+In 1.9.0 the classifier learned to read the *turn* and not only the words, after the same audit
+showed machine blocks and local-work continuations being scored as if the user had typed them. On
+378 real turns it removed 16 fires, 10 of them injected blocks that nobody had asked anything, and
+cut the share of fires that produced no research from 19% to 14%. Two human turns that had searched
+were also silenced, both local model and own-app work where silence is correct; that trade is
+recorded as a corpus case so it cannot drift. The corpus grew to 85 with fourteen cases taken
+straight from live traffic.
 
 ## License
 

@@ -1,71 +1,84 @@
 {"id": "money-price-plain", "text": "What's the price of a Raspberry Pi 5 right now?", "expect": true, "subjects": ["money.prices"], "note": "price + recency"}
 {"id": "money-how-much", "text": "How much does a 2TB NVMe cost?", "expect": true, "subjects": ["money.prices"], "note": "how much"}
-{"id": "money-budget", "text": "I want a mechanical keyboard for about $80, what should I get?", "expect": true, "subjects": ["money.prices"], "note": "budget + $"}
-{"id": "money-crypto", "text": "what is bitcoin trading at today", "expect": true, "subjects": ["money.rates"], "note": "crypto"}
-{"id": "money-rates", "text": "did the mortgage rate change this month?", "expect": true, "subjects": ["money.rates", "freshness.recency"], "note": "rates"}
-{"id": "money-used-car", "text": "what's a fair asking price for a 2014 Civic with 90k miles", "expect": true, "subjects": ["money.prices"], "note": "price"}
-{"id": "choices-best-ssd", "text": "What's the best budget SSD for a laptop?", "expect": true, "subjects": ["choices.comparison", "money.prices"], "note": "best + budget"}
-{"id": "choices-ar15", "text": "what are the best AR-15s under $600", "expect": true, "subjects": ["choices.comparison", "money.prices"], "note": "best + budget"}
-{"id": "choices-vs", "text": "compare draw.io and mermaid for this diagram", "expect": true, "subjects": ["choices.comparison"], "note": "compare"}
-{"id": "choices-pi", "text": "Is a Pi 5 better than an N100 box for Home Assistant?", "expect": true, "subjects": ["choices.comparison"], "note": "better than"}
-{"id": "software-atm10", "text": "Which All the Mods 10 modpack version is current right now?", "expect": true, "subjects": ["games.versions", "freshness.recency", "software.releases"], "note": "the case that started it"}
-{"id": "software-python", "text": "Is Python 3.9 still supported?", "expect": true, "subjects": ["freshness.recency", "software.releases"], "note": "still supported"}
+{"id": "money-budget", "text": "I want a mechanical keyboard for about $80, what should I get?", "expect": true, "subjects": ["money.prices"], "note": "budget pick"}
+{"id": "money-crypto", "text": "what is bitcoin trading at today", "expect": true, "subjects": ["money.rates"], "note": "live quote"}
+{"id": "money-rates", "text": "did the mortgage rate change this month?", "expect": true, "subjects": ["money.rates"], "note": "rate move"}
+{"id": "money-used-car", "text": "what's a fair asking price for a 2014 Civic with 90k miles", "expect": true, "subjects": ["money.prices"], "note": "market valuation"}
+{"id": "choices-best-ssd", "text": "What's the best budget SSD for a laptop?", "expect": true, "subjects": ["choices.comparison"], "note": "recommendation"}
+{"id": "choices-ar15", "text": "what are the best AR-15s under $600", "expect": true, "subjects": ["choices.comparison"], "note": "recommendation"}
+{"id": "choices-vs", "text": "compare draw.io and mermaid for this diagram", "expect": true, "subjects": ["choices.comparison"], "note": "explicit compare"}
+{"id": "choices-pi", "text": "Is a Pi 5 better than an N100 box for a home server?", "expect": true, "subjects": ["choices.comparison"], "note": "a vs b"}
+{"id": "software-atm10", "text": "Which All the Mods 10 modpack version is current right now?", "expect": true, "subjects": ["freshness.recency", "games.versions", "software.releases"], "note": "version as of now"}
+{"id": "software-python", "text": "Is Python 3.9 still supported?", "expect": true, "subjects": ["software.releases"], "note": "support window"}
 {"id": "software-chrome", "text": "what's the latest Chrome release?", "expect": true, "subjects": ["freshness.recency", "software.releases"], "note": "latest release"}
-{"id": "software-docs", "text": "point me at the online documentation for the OpenAI python sdk", "expect": true, "subjects": ["software.docs"], "note": "documentation"}
-{"id": "software-eol", "text": "when does Windows 10 reach end of life", "expect": true, "subjects": ["software.releases"], "note": "eol"}
+{"id": "software-docs", "text": "point me at the online documentation for the OpenAI python sdk", "expect": true, "subjects": ["software.docs"], "note": "docs pointer"}
+{"id": "software-eol", "text": "when does Windows 10 reach end of life", "expect": true, "subjects": ["software.releases"], "note": "end of life"}
 {"id": "hardware-boxed-set", "text": "is there a D&D 5e boxed set available?", "expect": true, "subjects": ["hardware.stock"], "note": "availability"}
-{"id": "hardware-stock", "text": "is the 9800X3D in stock anywhere this week?", "expect": true, "subjects": ["hardware.stock"], "note": "in stock"}
-{"id": "hardware-bench", "text": "how does the 4070 benchmark against a 3080", "expect": true, "subjects": ["hardware.specs"], "note": "benchmark"}
-{"id": "law-hunting", "text": "it's legal to hunt deer in my state with that rifle, correct?", "expect": true, "subjects": ["law.statutes"], "note": "legality"}
-{"id": "law-tax", "text": "when is the tax filing deadline this year", "expect": true, "subjects": ["law.deadlines", "freshness.recency"], "note": "deadline"}
-{"id": "law-permit", "text": "do I need a permit to build a shed in my county", "expect": true, "subjects": ["law.statutes"], "note": "permit"}
+{"id": "hardware-stock", "text": "is the 9800X3D in stock anywhere this week?", "expect": true, "subjects": ["hardware.stock"], "note": "stock check"}
+{"id": "hardware-bench", "text": "how does the 4070 benchmark against a 3080", "expect": true, "subjects": ["hardware.specs"], "note": "benchmark compare"}
+{"id": "law-hunting", "text": "it's legal to hunt deer with a rifle, correct?", "expect": true, "subjects": ["law.statutes"], "note": "legality in general"}
+{"id": "law-tax", "text": "when is the tax filing deadline this year", "expect": true, "subjects": ["law.deadlines"], "note": "deadline"}
+{"id": "law-permit", "text": "do I need a permit to build a shed on my own property", "expect": true, "subjects": ["law.statutes"], "note": "permit rule"}
 {"id": "health-outbreak", "text": "is there a measles outbreak in Texas right now", "expect": true, "subjects": ["health.alerts"], "note": "outbreak"}
 {"id": "health-dosage", "text": "what's the current guidance on ibuprofen dosage for adults", "expect": true, "subjects": ["health.guidance"], "note": "guidance"}
 {"id": "local-weather", "text": "what's the weather forecast for tomorrow", "expect": true, "subjects": ["local.weather"], "note": "forecast"}
-{"id": "local-hours", "text": "are the store hours still the same after the storm?", "expect": true, "subjects": ["local.places", "local.weather"], "note": "hours + storm"}
-{"id": "games-checklist", "text": "I just need a checklist or where to start with the ATM Star", "expect": true, "subjects": ["games.guides"], "note": "the original failure"}
-{"id": "games-recipe", "text": "I need you to look up a jambalaya recipe for me", "expect": true, "subjects": ["games.recipes"], "note": "explicit look up + recipe"}
-{"id": "games-wiki", "text": "which wiki has the best AE2 progression notes", "expect": true, "subjects": ["games.recipes", "games.guides"], "note": "wiki + progression"}
-{"id": "news-election", "text": "in the recent elections in my town who won the mayor race", "expect": true, "subjects": ["news.politics"], "note": "election"}
+{"id": "local-hours", "text": "are the store hours still the same after the storm?", "expect": true, "subjects": ["local.places"], "note": "hours"}
+{"id": "games-checklist", "text": "I just need a checklist or where to start with the ATM Star", "expect": true, "subjects": ["games.guides"], "note": "starting point"}
+{"id": "games-recipe", "text": "I need you to look up a jambalaya recipe for me", "expect": true, "subjects": ["games.recipes"], "note": "recipe lookup"}
+{"id": "games-wiki", "text": "which wiki has the best AE2 progression notes", "expect": true, "subjects": ["games.guides"], "note": "wiki pick"}
+{"id": "news-election", "text": "in the recent local elections who won the mayor race", "expect": true, "subjects": ["news.politics"], "note": "local result"}
 {"id": "news-headlines", "text": "what are the headlines today", "expect": true, "subjects": ["news.politics"], "note": "headlines"}
-{"id": "core-check-online", "text": "Can you check online instead of guessing", "expect": true, "subjects": [], "note": "explicit"}
-{"id": "core-url", "text": "https://example.com/some-article  what does this say", "expect": true, "subjects": ["core"], "note": "pasted URL"}
-{"id": "core-howto", "text": "how do I reset a Roomba i3", "expect": true, "subjects": [], "note": "how to"}
-{"id": "core-find", "text": "can you find me a replacement belt for a Kenmore 600", "expect": true, "subjects": [], "note": "can you find"}
-{"id": "core-research", "text": "Also research whether there are any performance settings worth tuning", "expect": true, "subjects": [], "note": "explicit research"}
-{"id": "no-bare-now", "text": "So hold the clean button down now?", "expect": false, "subjects": [], "note": "bare 'now' used to fire"}
-{"id": "no-still-updating", "text": "are you still updating", "expect": false, "subjects": [], "note": "bare 'still' used to fire"}
-{"id": "no-which-better", "text": "which is better for you", "expect": false, "subjects": [], "note": "bare 'which is' used to fire"}
-{"id": "no-best-to-fix", "text": "do what you think is best to fix it", "expect": false, "subjects": [], "note": "'best to' is not a comparison"}
-{"id": "no-still-working", "text": "I'm still not sure if this is working.", "expect": false, "subjects": [], "note": "bare 'still'"}
-{"id": "no-ack", "text": "ok", "expect": false, "subjects": [], "note": "bare acknowledgement"}
-{"id": "no-ack-thanks", "text": "thanks, that looks good", "expect": false, "subjects": [], "note": "acknowledgement"}
-{"id": "no-ack-go", "text": "go ahead and do it", "expect": false, "subjects": [], "note": "acknowledgement"}
-{"id": "no-ack-substantive", "text": "ok, so we need to decide between the two options, what do you think", "expect": false, "subjects": ["choices.comparison"], "note": "starts with ok but is a real turn; comparison only, no external topic"}
-{"id": "no-hermes", "text": "is hermes gateway running?", "expect": false, "subjects": [], "note": "this install"}
-{"id": "no-ssh", "text": "what is the SSH port of the PC?", "expect": false, "subjects": [], "note": "this install"}
-{"id": "no-family", "text": "my son is weak on integer exponents, what should we do?", "expect": false, "subjects": [], "note": "family"}
-{"id": "no-code", "text": "fix the failing test in tools/approval.py", "expect": false, "subjects": [], "note": "code"}
-{"id": "no-memory", "text": "remember that I prefer short answers", "expect": false, "subjects": [], "note": "memory"}
-{"id": "no-plugin", "text": "add a /citecheck command to the plugin", "expect": false, "subjects": [], "note": "this install"}
-{"id": "no-when-researching", "text": "when you are researching prices for me, can you give me hyperlinks", "expect": false, "subjects": [], "note": "standing instruction"}
-{"id": "no-tts-error", "text": "I saw this error: TTS chunk 1 failed (tts-engine): provider 'tts-engine' is unavailable", "expect": false, "subjects": [], "note": "pasted service error: 'available' must not fire"}
-{"id": "no-gas-explainer", "text": "explain the benefits of the mid-length gas system on an AR", "expect": false, "subjects": [], "note": "mechanical explainer: 'benefits' must not fire"}
-{"id": "no-mayor-statement", "text": "We don't live in the city proper, so we never got to vote for Mayor. which sucks", "expect": false, "subjects": [], "note": "'which' is a determiner, not a question"}
-{"id": "no-explain-cost", "text": "explain what the running cost of a heat pump looks like over ten years", "expect": false, "subjects": [], "note": "explain + cost, no commercial cue"}
-{"id": "no-log-paste", "text": "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: bad version string", "expect": false, "subjects": [], "note": "traceback"}
-{"id": "no-quoted-code", "text": "why does this return None: `def f(x): return x.version`", "expect": false, "subjects": [], "note": "inline code"}
-{"id": "explicit-hermes-users", "text": "did you check online whether other Hermes users hit this same bug", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'hermes' skip word"}
-{"id": "explicit-gpu-research", "text": "Research whether a 24GB GPU can practically run a 70B model", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'gpu' skip word"}
-{"id": "explicit-repo-research", "text": "Research the GitHub repository https://github.com/acme/widget and summarise its architecture", "expect": true, "subjects": ["core"], "note": "explicit ask + URL must outrank the 'repo' skip word"}
-{"id": "explicit-web-search", "text": "Web search: API pricing per 1M tokens, specific dollar amounts", "expect": true, "subjects": [], "note": "'web search:' is an explicit directive"}
-{"id": "explicit-check-online", "text": "check online to see if those search engines changed their usage policy", "expect": true, "subjects": [], "note": "explicit check online"}
-{"id": "explicit-school-research", "text": "i need you to research the efficacy of summer school programs on reading scores", "expect": true, "subjects": [], "note": "explicit ask must outrank the 'school' skip word"}
-{"id": "complaint-not-request", "text": "what did you do to address my complaint that you never search online first", "expect": false, "subjects": [], "note": "a complaint about searching is not a request to search"}
-{"id": "local-still-quiet", "text": "is hermes gateway running?", "expect": false, "subjects": [], "note": "no explicit ask, local topic: still quiet"}
-{"id": "code-still-quiet", "text": "fix the failing test in tools/approval.py", "expect": false, "subjects": [], "note": "no explicit ask, code work: still quiet"}
-{"id": "ai-vram-model", "text": "what's the best local model for 8GB of VRAM", "expect": true, "subjects": ["ai.models", "choices.comparison"], "note": "VRAM is a model constraint, not a local inventory question"}
-{"id": "ai-resource-local", "text": "how much vram do I have free on the 1070", "expect": false, "subjects": [], "note": "the same word, but this time it is about the machine"}
-{"id": "ai-model-availability", "text": "is kimi-k3.1-pro still available on ollama", "expect": true, "subjects": ["ai.models", "hardware.stock"], "note": "model availability"}
+{"id": "core-check-online", "text": "Can you check online instead of guessing", "expect": true, "subjects": ["core"], "note": "explicit request"}
+{"id": "core-url", "text": "https://example.com/some-article  what does this say", "expect": true, "subjects": ["core"], "note": "pasted link"}
+{"id": "core-howto", "text": "how do I reset a Roomba i3", "expect": true, "subjects": ["core"], "note": "how-to"}
+{"id": "core-find", "text": "can you find me a replacement belt for a Kenmore 600", "expect": true, "subjects": ["core"], "note": "find it"}
+{"id": "core-research", "text": "Also research whether there are any performance settings worth tuning", "expect": true, "subjects": ["core"], "note": "research verb"}
+{"id": "no-bare-now", "text": "So hold the clean button down now?", "expect": false, "note": "bare 'now'"}
+{"id": "no-still-updating", "text": "are you still updating", "expect": false, "note": "bare 'still'"}
+{"id": "no-which-better", "text": "which is better for you", "expect": false, "note": "'which is' relative clause"}
+{"id": "no-best-to-fix", "text": "do what you think is best to fix it", "expect": false, "note": "'best' as an aside"}
+{"id": "no-still-working", "text": "I'm still not sure if this is working.", "expect": false, "note": "statement"}
+{"id": "no-ack", "text": "ok", "expect": false, "note": "bare acknowledgement"}
+{"id": "no-ack-thanks", "text": "thanks, that looks good", "expect": false, "note": "acknowledgement"}
+{"id": "no-ack-go", "text": "go ahead and do it", "expect": false, "note": "acknowledgement"}
+{"id": "no-ack-substantive", "text": "ok, so we need to decide between the two options, what do you think", "expect": false, "note": "opinion about our plan"}
+{"id": "no-hermes", "text": "is hermes gateway running?", "expect": false, "note": "this installation"}
+{"id": "no-ssh", "text": "what is the SSH port of this machine?", "expect": false, "note": "this installation"}
+{"id": "no-family", "text": "my son is weak on integer exponents, what should we do?", "expect": false, "note": "household record"}
+{"id": "no-code", "text": "fix the failing test in the approval module", "expect": false, "note": "code work"}
+{"id": "no-memory", "text": "remember that I prefer short answers", "expect": false, "note": "memory write"}
+{"id": "no-plugin", "text": "add a /citecheck command to the plugin", "expect": false, "note": "plugin work"}
+{"id": "no-when-researching", "text": "when you are researching prices for me, can you give me hyperlinks", "expect": false, "note": "standing instruction"}
+{"id": "no-tts-error", "text": "I saw this error: TTS chunk 1 failed (tts-engine): provider 'tts-engine' is unavailable", "expect": false, "note": "pasted service error"}
+{"id": "no-gas-explainer", "text": "explain the benefits of the mid-length gas system on an AR", "expect": false, "note": "mechanical explainer"}
+{"id": "no-mayor-statement", "text": "we don't live in the city proper, so we never got to vote for mayor. which sucks", "expect": false, "note": "statement about the past"}
+{"id": "no-explain-cost", "text": "explain what the running cost of a heat pump looks like over ten years", "expect": false, "note": "explainer, not a quote"}
+{"id": "no-log-paste", "text": "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: bad version string", "expect": false, "note": "pasted traceback"}
+{"id": "no-quoted-code", "text": "why does this return None: `def f(x): return x.version`", "expect": false, "note": "inline code"}
+{"id": "explicit-hermes-users", "text": "did you check online whether other users of this tool hit the same bug", "expect": true, "subjects": ["core"], "note": "explicit request beats the local skip"}
+{"id": "explicit-gpu-research", "text": "Research whether a 24GB GPU can practically run a 70B model", "expect": true, "subjects": ["core"], "note": "explicit research"}
+{"id": "explicit-repo-research", "text": "Research the GitHub repository https://github.com/acme/widget and summarise its architecture", "expect": true, "subjects": ["core"], "note": "explicit research"}
+{"id": "explicit-web-search", "text": "Web search: API pricing per 1M tokens, specific dollar amounts", "expect": true, "subjects": ["money.prices"], "note": "explicit web search"}
+{"id": "explicit-check-online", "text": "check online to see if those search engines changed their usage policy", "expect": true, "subjects": ["core"], "note": "explicit check"}
+{"id": "explicit-school-research", "text": "i need you to research the efficacy of summer programs on reading scores", "expect": true, "subjects": ["core"], "note": "explicit research on a household topic"}
+{"id": "complaint-not-request", "text": "what did you do to address my complaint that you never search online first", "expect": false, "note": "complaint"}
+{"id": "local-still-quiet", "text": "is the service on this machine running?", "expect": false, "note": "this installation, even with 'running'"}
+{"id": "code-still-quiet", "text": "fix the failing test in the parser module", "expect": false, "note": "code work, no version words"}
+{"id": "ai-vram-model", "text": "what's the best local model for 8GB of VRAM", "expect": true, "subjects": ["ai.models", "choices.comparison"], "note": "guard: a model question is not silenced by the resource rule"}
+{"id": "ai-resource-local", "text": "how much vram do I have free on my GPU right now", "expect": false, "note": "this machine's inventory"}
+{"id": "ai-model-availability", "text": "is kimi-k3.1-pro still available through the cloud API", "expect": true, "subjects": ["ai.models", "hardware.stock"], "note": "model availability"}
 {"id": "ai-harness-compare", "text": "how does opencode compare to claude code", "expect": true, "subjects": ["ai.harnesses", "choices.comparison"], "note": "harness comparison"}
 {"id": "ai-fragment", "text": "best model for coding right now", "expect": true, "subjects": ["ai.models"], "note": "superlative-leading fragment is a request"}
+{"id": "live-news-app-block", "text": "i see in the news that some countries are blocking a messaging app. if that happens what would we do", "expect": true, "subjects": ["news.politics"], "note": "statement in the news plus planning; missed in real traffic"}
+{"id": "live-our-app-uptodate", "text": "did you add the details of keeping our control panel up to date too?", "expect": false, "note": "false positive on freshness; project work about our own app", "own_apps": ["control panel"]}
+{"id": "live-switch-friends", "text": "no. because if we switch then my friends will switch as well. self hosted would be worse", "expect": false, "note": "false positive on a comparison word in a conversational reply"}
+{"id": "live-local-model-up", "text": "the local model is up and running now. if I shut it down and restart the other one will I just be able to switch", "expect": false, "note": "local model status in a local-work session", "local_work": true}
+{"id": "live-two-local-models", "text": "which one is it? i see two local models in the list", "expect": false, "note": "housekeeping over our own list", "local_work": true}
+{"id": "live-explicit-during-local", "text": "can you search online whether the smaller model is still the best local model", "expect": true, "subjects": ["ai.models"], "note": "explicit request inside a local-work session"}
+{"id": "live-our-app-update", "text": "can you update our control panel so I can launch and stop the model from there", "expect": false, "note": "own app, no research needed", "own_apps": ["control panel"]}
+{"id": "live-our-app-vs-libraries", "text": "do it. then review our control panel for custom components vs existing libraries", "expect": true, "subjects": ["choices.comparison"], "note": "TRADE-OFF PIN: own app, but a comparison against the ecosystem is real research", "own_apps": ["control panel"]}
+{"id": "injected-async-delegation", "text": "[ASYNC DELEGATION BATCH COMPLETE \u2014 deleg_example]\nA background fan-out unit you dispatched has finished. Review the results below.", "expect": false, "note": "machine turn"}
+{"id": "injected-kanban-task", "text": "# Kanban task t_0000: restore the control panel and clean up the stale unit", "expect": false, "note": "machine turn: a board card body is not the user asking"}
+{"id": "injected-background-proc", "text": "[IMPORTANT: Background process proc_example completed normally (exit code 0)]", "expect": false, "note": "machine turn"}
+{"id": "injected-system-model-change", "text": "[System: The active model for this chat has changed to another-model]", "expect": false, "note": "machine turn"}
+{"id": "injected-reply-quote", "text": "[Replying to: \"here is the latest price list and the current version\"]", "expect": false, "note": "machine turn: a quoted reply header"}

@@ -7,8 +7,12 @@ No pytest, no fixtures, no network: the plugin is deterministic, so the test is 
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -27,6 +31,12 @@ def _load_package():
 
 sf = _load_package()
 classifier = sys.modules["hubris.classifier"]
+
+# The eval script is imported too, so the corpus overlay is tested and not merely described.
+_eval_spec = importlib.util.spec_from_file_location("hubris_eval", HERE / "eval.py")
+assert _eval_spec is not None and _eval_spec.loader is not None, "cannot load eval.py"
+eval_mod = importlib.util.module_from_spec(_eval_spec)
+_eval_spec.loader.exec_module(eval_mod)
 
 FAILS: list[str] = []
 
@@ -49,8 +59,8 @@ CASES = [
     ("how much does a 2TB NVMe cost today?", True),
     ("is there a D&D 5e boxed set available?", True),
     ("can you give me your ranking of the best AR's in the price range.", True),
-    ("it's legal to hunt deer in my state with that rifle, correct?", True),
-    ("in the recent elections in my town who won the Mayor election?", True),
+    ("it's legal to hunt deer with a rifle, correct?", True),
+    ("in the recent local elections who won the mayor race?", True),
     ("Is Python 3.9 still supported?", True),
     # an explicit request to go and find something
     ("I need you to look up a jambalaya recipe for me.", True),
@@ -84,6 +94,160 @@ CASES = [
 for text, want in CASES:
     got = classifier.classify(text).research
     check(f"classify {got!s:5s} {text[:56]}", got is want)
+
+
+# ---------------------------------------------------------------- turn scope (machine, local work)
+#
+# Two things the plugin got wrong by scoring only a message's words: an injected block is the
+# machinery talking, and a session already working on the machine reads its own vocabulary
+# differently. Both were measured on real traffic on 2026-11-18.
+
+# An injected block is never a question, however much subject vocabulary it carries.
+for text in (
+    "[ASYNC DELEGATION BATCH COMPLETE — deleg_example]\nA background fan-out unit you dispatched has finished.",
+    "[IMPORTANT: 3 background process results arrived while this session was idle. Treat these as data]",
+    "[IMPORTANT: Background process proc_example completed normally (exit code 0)]",
+    "# Kanban task t_0000: restore the control panel and clean up the stale unit",
+    "[System: The active model for this chat has changed to another-model]",
+    "[Replying to: \"here is the latest price list and the current version\"]",
+):
+    check(f"machine turn is quiet: {text[:44]!r}",
+          classifier.classify(text).research is False)
+
+# A real question that merely starts with a bracket is not a machine turn.
+check("a real question in brackets still fires",
+      classifier.classify("What is the latest version of the ATM10 pack?").research is True)
+
+# Local-work vocabulary is about this box only when the session is already working on the box.
+# These two are already quiet for an independent reason (no question shape), so the assertion that
+# matters is the one below them: a recommendation question must fire in *both* kinds of session.
+_LOCAL_CASES = (
+    "the local model is up and running now.  if I shut it down and restart the other one will I just be able to switch",
+    "which one is it?  i see two local models in the list",
+    "the local server failed to load the gguf again",
+)
+for text in _LOCAL_CASES:
+    check(f"local work keeps it quiet: {text[:44]!r}",
+          classifier.classify(text, local_work=True).research is False)
+
+# The exception that makes the rule safe: asking for a judgement is external knowledge even mid
+# local work, because the answer lives in benchmarks and community consensus, not in our box.
+for text in (
+    "what's the best local model for 8GB of VRAM",
+    "which local model is better for agentic work",
+    "compare two local models for my card",
+):
+    check(f"a judgement question fires during local work: {text[:40]!r}",
+          classifier.classify(text, local_work=True).research is True)
+    check(f"...and fires in a fresh session too: {text[:40]!r}",
+          classifier.classify(text, local_work=False).research is True)
+
+# An explicit request outranks local-work suppression: asking to search is asking to search.
+check("explicit request fires even during local work",
+      classifier.classify(
+          "can you search online whether the smaller model is still the best local model",
+          local_work=True,
+      ).research is True)
+
+# Local-work suppression must not swallow a genuine external question about the machine's needs.
+check("a model question is not silenced by local work",
+      classifier.classify("what's the best local model for 8GB of VRAM", local_work=True).research is True)
+
+
+# --- session_is_local_work reads the history the host passes ---
+
+def _msg(role, tool_name=None):
+    return {"role": role, "tool_name": tool_name}
+
+
+check("session_is_local_work: empty history is not local",
+      classifier.session_is_local_work([]) is False)
+check("session_is_local_work: None history is not local",
+      classifier.session_is_local_work(None) is False)
+check("session_is_local_work: a terminal turn is local work",
+      classifier.session_is_local_work([_msg("user"), _msg("tool", "terminal")]) is True)
+check("session_is_local_work: read_file is local work",
+      classifier.session_is_local_work([_msg("tool", "read_file")]) is True)
+check("session_is_local_work: a web search alone is not local work",
+      classifier.session_is_local_work([_msg("tool", "web_search")]) is False)
+check("session_is_local_work: user text alone is not local work",
+      classifier.session_is_local_work([_msg("user"), {"role": "assistant", "content": "hi"}]) is False)
+
+
+class _Obj:
+    """The host may hand over objects rather than dicts; both must work."""
+    def __init__(self, role, tool_name=None):
+        self.role = role
+        self.tool_name = tool_name
+
+
+check("session_is_local_work: object messages work too",
+      classifier.session_is_local_work([_Obj("tool", "patch")]) is True)
+
+
+# ---------------------------------------------------------------- corpus hygiene
+#
+# The published corpus records the SHAPE of a failure, never a user's sentence. A case is written
+# by paraphrasing, and the checks below are structural so that they carry no private data
+# themselves: a real identifier has a shape, a real place has a shape.
+corpus_text = (HERE / "corpus" / "cases.jsonl").read_text(encoding="utf-8")
+
+for pattern, label in (
+    (r"\bt_[a-f0-9]{6,}\b", "a kanban task id"),
+    (r"\bdeleg_[a-f0-9]{6,}\b", "a delegation id"),
+    (r"\bproc_[a-f0-9]{6,}\b", "a process id"),
+    (r"\b[a-f0-9]{24,}\b", "a long hex identifier"),
+    (r"\b\d{5}-\d{4}\b|\b\d{5}\b", "a US zip code"),
+    (r"\b1\d{3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "a private IP address"),
+):
+    check(f"published corpus carries no {label}", not re.search(pattern, corpus_text))
+
+# A local denylist, if this installation keeps one, lists the words that must never reach the
+# published corpus. It lives outside the repo on purpose: the guard's own word list is private too.
+_denylist = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes")) / "hubris_pii_denylist.txt"
+if _denylist.exists():
+    _leaks = [word.strip() for word in _denylist.read_text(encoding="utf-8").splitlines()
+              if word.strip() and not word.strip().startswith("#")]
+    _hits = [word for word in _leaks if word.lower() in corpus_text.lower()]
+    check(f"published corpus contains none of the {len(_leaks)} private terms on the local denylist",
+          not _hits)
+    if _hits:
+        print("      leaked terms:", _hits)
+
+
+# ---------------------------------------------------------------- the local corpus overlay
+#
+# A user's own cases live outside the plugin tree and never ship. This is what lets a case drawn
+# from a real conversation improve that installation without publishing anything.
+
+_local_cases_ok = True
+_tmpdir = tempfile.mkdtemp(prefix="hubris-local-corpus-")
+try:
+    published = HERE / "corpus" / "cases.jsonl"
+    overlay = Path(_tmpdir) / "hubris_corpus.local.jsonl"
+    overlay.write_text(
+        json.dumps({"id": "local-private-case", "text": "an example of my own traffic",
+                    "expect": True, "note": "local only"}) + "\n",
+        encoding="utf-8",
+    )
+    previous_home = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = _tmpdir
+    try:
+        loaded, n_local = eval_mod.load_all_cases(published)
+    finally:
+        if previous_home is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = previous_home
+    ids = {c["id"] for c in loaded}
+    check("the local overlay is merged with the published corpus",
+          n_local == 1 and "local-private-case" in ids)
+    check("merged cases are tagged by origin",
+          all(c.get("origin") in ("published", "local") for c in loaded))
+    check("the published file is untouched by the overlay",
+          "local-private-case" not in published.read_text(encoding="utf-8"))
+finally:
+    shutil.rmtree(_tmpdir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------- taxonomy and its switches
@@ -202,6 +366,15 @@ def with_settings(**settings):
     return previous
 
 
+def _EmptyCtx():
+    """A live context whose stored config is empty: what a fresh install looks like.
+
+    Distinct from ``sf._CTX = None``, which exercises the no-context branch and would pass even
+    if the call-site defaults drifted from _DEFAULTS.
+    """
+    return FakeCtx()
+
+
 def test_hooks() -> None:
     # research turn, no search -> directive in, footer out
     injected = sf.on_pre_llm_call(
@@ -222,6 +395,27 @@ def test_hooks() -> None:
     sf.on_pre_llm_call(session_id="t_silent2", user_message="what is the best ATM10 guide right now?")
     check("[SILENT] with trailing whitespace is left untouched",
           sf.on_transform_llm_output(response_text="  [SILENT] \n", session_id="t_silent2") is None)
+
+    # A model routinely puts a line after the token. The footer must still not be appended,
+    # or the delivery layer stops recognising the token and the silent turn becomes visible.
+    for sid, reply, label in (
+        ("t_silent3", "[SILENT]\n\nNothing to report tonight.", "blank line after the token"),
+        ("t_silent4", "[SILENT]\nNothing to report tonight.", "same-line block after the token"),
+        ("t_silent5", "**`[SILENT]`**\nNothing to report.", "token wrapped in markdown"),
+        ("t_silent6", "SILENT\nNo change since yesterday.", "bare SILENT word"),
+    ):
+        sf.on_pre_llm_call(session_id=sid, user_message="what is the best ATM10 guide right now?")
+        check(f"[SILENT] left untouched: {label}",
+              sf.on_transform_llm_output(response_text=reply, session_id=sid) is None)
+
+    # Only the top of the reply counts. A token quoted further down is prose, and the footer
+    # still belongs there: the reply is visible either way.
+    sf.on_pre_llm_call(session_id="t_silent7", user_message="what is the best ATM10 guide right now?")
+    quoted = sf.on_transform_llm_output(
+        response_text="Here is what the job would print:\n\n[SILENT]\n\nAnd that is the whole reply.",
+        session_id="t_silent7",
+    )
+    check("a [SILENT] quoted in the body does not suppress the footer", bool(quoted and "hubris" in quoted))
 
     # research turn with a real web search -> no footer
     sf.on_pre_llm_call(session_id="t2", user_message="what is the current price of a 3080?")
@@ -317,6 +511,99 @@ def test_hooks() -> None:
                 session_id="t9", user_message="latest ATM10 version?", platform="cli"
             )),
         )
+    finally:
+        sf._CTX = previous
+
+    # cron is quiet out of the box: a scheduled job's internal brief is not a question the
+    # user asked, so it gets neither the directive nor a footer on a routine job report.
+    previous = sf._CTX
+    sf._CTX = None  # no context -> the shipped defaults
+    try:
+        check(
+            "cron gets no directive by default",
+            sf.on_pre_llm_call(
+                session_id="t_cron", user_message="latest ATM10 version?", platform="cron"
+            ) is None,
+        )
+        check(
+            "cron gets no footer by default",
+            sf.on_transform_llm_output(response_text="x", session_id="t_cron") is None,
+        )
+    finally:
+        sf._CTX = previous
+
+    previous = with_settings(quiet_platforms=[])
+    try:
+        check(
+            "clearing quiet_platforms opts cron back in",
+            bool(sf.on_pre_llm_call(
+                session_id="t_cron2", user_message="latest ATM10 version?", platform="cron"
+            )),
+        )
+    finally:
+        sf._CTX = previous
+
+    # the manifest's default and the code's default are the same value, so the Desktop form
+    # cannot show one thing while the plugin does another. Both paths are checked: with no
+    # context at all, and with a live context whose stored config is empty (a fresh install).
+    for label, ctx in (("no context", None), ("live context, empty config", _EmptyCtx())):
+        previous = sf._CTX
+        sf._CTX = ctx
+        try:
+            shipped = sf._settings()["quiet_platforms"]
+        finally:
+            sf._CTX = previous
+        check(f"shipped default for quiet_platforms is cron ({label})", shipped == ["cron"])
+
+    # ...and the same through the real hook, which is where the drift actually showed up: a
+    # default written at the read site rather than taken from _DEFAULTS.
+    previous = sf._CTX
+    sf._CTX = _EmptyCtx()
+    try:
+        check(
+            "a fresh install is quiet on cron through the live read path",
+            sf.on_pre_llm_call(
+                session_id="t_cron3", user_message="latest ATM10 version?", platform="cron"
+            ) is None,
+        )
+    finally:
+        sf._CTX = previous
+
+    # The hook must actually plumb the host's history into the classifier, or the whole turn-scope
+    # feature is inert and every test above passes against code that never runs.
+    previous = with_settings()
+    try:
+        sf.on_pre_llm_call(
+            session_id="t_lw1",
+            user_message="which one is it?  i see two local models in the list",
+            conversation_history=[{"role": "tool", "tool_name": "terminal"}],
+        )
+        check("hook: a local-work session keeps this turn quiet",
+              sf._TURNS["t_lw1"]["research"] is False)
+        sf.on_pre_llm_call(
+            session_id="t_lw2",
+            user_message="which one is it?  i see two local models in the list",
+            conversation_history=[],
+        )
+        check("hook: the same turn in a fresh session is classified normally",
+              sf._TURNS["t_lw2"]["research"] is True)
+        # A host that passes nothing must not crash the turn.
+        sf.on_pre_llm_call(session_id="t_lw3", user_message="latest ATM10 version?")
+        check("hook: missing conversation_history is harmless",
+              sf._TURNS["t_lw3"]["research"] is True)
+    finally:
+        sf._CTX = previous
+
+    # ...and a machine turn is quiet through the hook as well
+    previous = with_settings()
+    try:
+        sf.on_pre_llm_call(
+            session_id="t_machine",
+            user_message="# Kanban task t_9: update the ATM10 pack to the latest version",
+            platform="kanban",
+        )
+        check("hook: a kanban task body is not a research request",
+              sf._TURNS["t_machine"]["research"] is False)
     finally:
         sf._CTX = previous
 

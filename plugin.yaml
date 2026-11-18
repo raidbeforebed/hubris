@@ -1,5 +1,5 @@
 name: hubris
-version: "1.8.2"
+version: "1.9.0"
 description: >-
   HUBRIS: Heuristic Unverified-Belief Research Injection Signal. It makes live web research the
   default before a factual answer. Every turn gets classified; when the question turns on current
@@ -52,12 +52,23 @@ config_schema:
     description: >-
       Words or phrases that always mean check the web, comma separated or one per line. Use it
       for a domain the topics miss.
-  quiet_platforms:
+  own_apps:
     type: str
     default: ""
+    placeholder: "my dashboard, my radio app"
+    label: Your own apps
+    description: >-
+      Names of things you built, so a question about them is not mistaken for a question about the
+      world. Comma separated. A comparison against the outside world still counts as research.
+  quiet_platforms:
+    type: str
+    default: "cron"
     placeholder: "discord_voice, telegram"
     label: Quiet platforms
-    description: Platforms that get no search request and no warning, comma separated.
+    description: >-
+      Platforms that get no search request and no warning, comma separated. A scheduled job's
+      internal brief is not a question you asked, so cron is quiet by default. Clear the field
+      to have hubris act on cron turns too.
 
   # ---- topics ---------------------------------------------------------------------------
   # One switch per topic. A topic off silences everything inside it; mute single subjects in
