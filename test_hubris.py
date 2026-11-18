@@ -69,7 +69,7 @@ CASES = [
     # never research: this installation, family, code, memory, local operation
     ("is hermes gateway running?", False),
     ("what is the SSH port of the PC?", False),
-    ("my son is weak on integer exponents, what should we do?", False),
+    ("the youngest is weak on integer exponents, what should we do?", False),
     ("fix the failing test in tools/approval.py", False),
     ("reply with exactly: NONE2", False),
     ("remember that I prefer short answers", False),
@@ -203,16 +203,32 @@ for pattern, label in (
     check(f"published corpus carries no {label}", not re.search(pattern, corpus_text))
 
 # A local denylist, if this installation keeps one, lists the words that must never reach the
-# published corpus. It lives outside the repo on purpose: the guard's own word list is private too.
+# published plugin. It lives outside the repo on purpose: the guard's own word list is private too.
+# Every shipped text file is scanned, not just the corpus: a first version of this guard checked
+# only cases.jsonl and let a real name sit in the test file for ten days.
 _denylist = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes")) / "hubris_pii_denylist.txt"
 if _denylist.exists():
     _leaks = [word.strip() for word in _denylist.read_text(encoding="utf-8").splitlines()
               if word.strip() and not word.strip().startswith("#")]
-    _hits = [word for word in _leaks if word.lower() in corpus_text.lower()]
-    check(f"published corpus contains none of the {len(_leaks)} private terms on the local denylist",
+    _shipped = [p for p in HERE.rglob("*")
+                if p.is_file() and p.suffix.lower() in
+                {".py", ".md", ".yaml", ".yml", ".jsonl", ".json", ".txt", ".js", ".mjs"}
+                and "__pycache__" not in p.parts and ".pytest_cache" not in p.parts]
+    _hits = []
+    for _file in _shipped:
+        try:
+            _text = _file.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for _word in _leaks:
+            # Word boundaries, not a bare substring: a short acronym must not match a longer word
+            # that happens to contain it, and a denylist that cries wolf gets switched off.
+            if re.search(rf"(?<!\w){re.escape(_word)}(?!\w)", _text, re.IGNORECASE):
+                _hits.append(f"{_file.relative_to(HERE)}: {_word}")
+    check(f"no private term on the local denylist appears in any of the {len(_shipped)} shipped files",
           not _hits)
     if _hits:
-        print("      leaked terms:", _hits)
+        print("      leaked:", _hits[:8])
 
 
 # ---------------------------------------------------------------- the local corpus overlay
